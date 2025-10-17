@@ -3,25 +3,59 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Navbar } from "@/components/Navbar";
+import { AuthModal } from "@/components/AuthModal";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
+import HomePage from "@/pages/HomePage";
+import SearchPage from "@/pages/SearchPage";
+import PropertyDetail from "@/pages/PropertyDetail";
+import PropertyForm from "@/pages/PropertyForm";
+import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={HomePage} />
+      <Route path="/cerca" component={SearchPage} />
+      <Route path="/proprieta/:id" component={PropertyDetail} />
+      <Route path="/proprieta/nuova" component={PropertyForm} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/diventa-host" component={PropertyForm} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function App() {
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const { data: user } = useQuery({
+    queryKey: ["/api/user"],
+    retry: false,
+  });
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    window.location.href = "/";
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <div className="min-h-screen bg-background">
+          <Navbar
+            user={user}
+            onAuthClick={() => setAuthModalOpen(true)}
+            onLogout={handleLogout}
+          />
+          <Router />
+          <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+        </div>
         <Toaster />
-        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );
