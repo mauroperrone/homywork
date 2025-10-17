@@ -37,6 +37,7 @@ export interface IStorage {
   
   // Availability
   checkAvailability(propertyId: string, checkIn: Date, checkOut: Date): Promise<boolean>;
+  getPropertyAvailability(propertyId: string): Promise<any[]>;
   blockDates(propertyId: string, dates: Date[], source: string): Promise<void>;
   
   // Calendar Syncs
@@ -227,6 +228,12 @@ export class DbStorage implements IStorage {
       );
 
     return conflictingBookings.length === 0;
+  }
+
+  async getPropertyAvailability(propertyId: string): Promise<any[]> {
+    return await db.select().from(availability)
+      .where(eq(availability.propertyId, propertyId))
+      .orderBy(availability.date);
   }
 
   async blockDates(propertyId: string, dates: Date[], source: string): Promise<void> {

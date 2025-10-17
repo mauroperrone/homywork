@@ -8,12 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
-import { format, differenceInDays } from "date-fns";
+import { useState, useEffect } from "react";
+import { format, differenceInDays, isSameDay, isWithinInterval, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import type { Property } from "@shared/schema";
 import { Calendar as CalendarIcon, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 
 interface BookingWidgetProps {
   property: Property;
@@ -24,10 +25,35 @@ export function BookingWidget({ property }: BookingWidgetProps) {
   const [checkOut, setCheckOut] = useState<Date>();
   const [guests, setGuests] = useState<number>(1);
 
+  const { data: availabilityData } = useQuery({
+    queryKey: ["/api/properties", property.id, "availability"],
+  });
+
   const nights = checkIn && checkOut ? differenceInDays(checkOut, checkIn) : 0;
   const subtotal = nights * property.pricePerNight;
   const serviceFee = Math.round(subtotal * 0.12); // 12% service fee
   const total = subtotal + serviceFee;
+
+  const isDateUnavailable = (date: Date) => {
+    if (date < new Date()) return true;
+
+    // Check bookings
+    const bookings = availabilityData?.bookings || [];
+    const isBooked = bookings.some((booking: any) => {
+      const checkInDate = parseISO(booking.checkIn);
+      const checkOutDate = parseISO(booking.checkOut);
+      return booking.status === 'confirmed' && isWithinInterval(date, { start: checkInDate, end: checkOutDate });
+    });
+
+    // Check availability blocks
+    const availabilityBlocks = availabilityData?.availability || [];
+    const isBlocked = availabilityBlocks.some((block: any) => {
+      const blockDate = parseISO(block.date);
+      return !block.isAvailable && isSameDay(date, blockDate);
+    });
+
+    return isBooked || isBlocked;
+  };
 
   const handleReserve = () => {
     if (!checkIn || !checkOut) return;
@@ -94,7 +120,7 @@ export function BookingWidget({ property }: BookingWidgetProps) {
             setCheckIn(range?.from);
             setCheckOut(range?.to);
           }}
-          disabled={(date) => date < new Date()}
+          disabled={isDateUnavailable}
           numberOfMonths={1}
           locale={it}
           className="rounded-md border"

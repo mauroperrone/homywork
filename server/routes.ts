@@ -355,6 +355,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Availability routes
+  app.get('/api/properties/:propertyId/availability', async (req, res) => {
+    try {
+      const { month, year } = req.query;
+      const propertyId = req.params.propertyId;
+      
+      // Get all bookings for the property in the specified month/year
+      const bookings = await storage.getPropertyBookings(propertyId);
+      const availability = await storage.getPropertyAvailability(propertyId);
+      
+      // Return both bookings and availability blocks
+      res.json({ bookings, availability });
+    } catch (error) {
+      console.error("Error fetching availability:", error);
+      res.status(500).json({ message: "Failed to fetch availability" });
+    }
+  });
+
   // Reviews routes
   app.get('/api/properties/:propertyId/reviews', async (req, res) => {
     try {
