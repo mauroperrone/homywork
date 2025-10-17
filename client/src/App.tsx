@@ -5,8 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/Navbar";
 import { AuthModal } from "@/components/AuthModal";
+import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 
 import HomePage from "@/pages/HomePage";
 import SearchPage from "@/pages/SearchPage";
@@ -29,32 +29,32 @@ function Router() {
   );
 }
 
-function App() {
+function AppContent() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const { user } = useAuth();
 
-  const { data: user } = useQuery({
-    queryKey: ["/api/user"],
-    retry: false,
-  });
-
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-    window.location.href = "/";
+  const handleLogout = () => {
+    window.location.href = "/api/logout";
   };
 
   return (
+    <div className="min-h-screen bg-background">
+      <Navbar
+        user={user}
+        onAuthClick={() => setAuthModalOpen(true)}
+        onLogout={handleLogout}
+      />
+      <Router />
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+    </div>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background">
-          <Navbar
-            user={user}
-            onAuthClick={() => setAuthModalOpen(true)}
-            onLogout={handleLogout}
-          />
-          <Router />
-          <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
-        </div>
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

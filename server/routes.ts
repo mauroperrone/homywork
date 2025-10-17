@@ -1,15 +1,314 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import Stripe from "stripe";
+import { 
+  insertPropertySchema, 
+  insertBookingSchema, 
+  insertCalendarSyncSchema,
+  insertReviewSchema 
+} from "@shared/schema";
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-06-20",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Auth setup
+  await setupAuth(app);
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post('/api/auth/become-host', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.updateUserRole(userId, 'host');
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Properties routes
+  app.get('/api/properties', async (req, res) => {
+    try {
+      const properties = await storage.getProperties();
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
+  app.get('/api/properties/:id', async (req, res) => {
+    try {
+      const property = await storage.getPropertyWithHost(req.params.id);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      res.json(property);
+    } catch (error) {
+      console.error("Error fetching property:", error);
+      res.status(500).json({ message: "Failed to fetch property" });
+    }
+  });
+
+  app.post('/api/properties', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertPropertySchema.parse({
+        ...req.body,
+        hostId: userId,
+      });
+      
+      // Update user role to host if not already
+      await storage.updateUserRole(userId, 'host');
+      
+      const property = await storage.createProperty(validatedData);
+      res.status(201).json(property);
+    } catch (error: any) {
+      console.error("Error creating property:", error);
+      res.status(400).json({ message: error.message || "Failed to create property" });
+    }
+  });
+
+  app.patch('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const property = await storage.getProperty(req.params.id);
+      
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      if (property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to update this property" });
+      }
+
+      const updated = await storage.updateProperty(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating property:", error);
+      res.status(500).json({ message: "Failed to update property" });
+    }
+  });
+
+  app.delete('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const property = await storage.getProperty(req.params.id);
+      
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      if (property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this property" });
+      }
+
+      await storage.deleteProperty(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting property:", error);
+      res.status(500).json({ message: "Failed to delete property" });
+    }
+  });
+
+  // Host-specific properties
+  app.get('/api/host/properties', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const properties = await storage.getHostProperties(userId);
+      res.json(properties);
+    } catch (error) {
+      console.error("Error fetching host properties:", error);
+      res.status(500).json({ message: "Failed to fetch host properties" });
+    }
+  });
+
+  // Bookings routes
+  app.get('/api/bookings/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const booking = await storage.getBookingWithDetails(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      console.error("Error fetching booking:", error);
+      res.status(500).json({ message: "Failed to fetch booking" });
+    }
+  });
+
+  app.get('/api/guest/bookings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bookings = await storage.getGuestBookings(userId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching guest bookings:", error);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  app.get('/api/host/bookings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bookings = await storage.getHostBookings(userId);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching host bookings:", error);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Stripe payment intent for booking
+  app.post('/api/create-payment-intent', isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, propertyId } = req.body;
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "eur",
+        metadata: {
+          propertyId,
+          userId: req.user.claims.sub,
+        },
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error("Error creating payment intent:", error);
+      res.status(500).json({ message: "Error creating payment intent: " + error.message });
+    }
+  });
+
+  // Create booking with payment
+  app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertBookingSchema.parse({
+        ...req.body,
+        guestId: userId,
+      });
+
+      // Check availability
+      const isAvailable = await storage.checkAvailability(
+        validatedData.propertyId,
+        validatedData.checkIn,
+        validatedData.checkOut
+      );
+
+      if (!isAvailable) {
+        return res.status(400).json({ message: "Property not available for selected dates" });
+      }
+
+      const booking = await storage.createBooking(validatedData);
+      res.status(201).json(booking);
+    } catch (error: any) {
+      console.error("Error creating booking:", error);
+      res.status(400).json({ message: error.message || "Failed to create booking" });
+    }
+  });
+
+  // Confirm booking after payment
+  app.post('/api/bookings/:id/confirm', isAuthenticated, async (req: any, res) => {
+    try {
+      const { paymentIntentId } = req.body;
+      const booking = await storage.updateBookingStatus(
+        req.params.id,
+        'confirmed',
+        paymentIntentId
+      );
+      res.json(booking);
+    } catch (error) {
+      console.error("Error confirming booking:", error);
+      res.status(500).json({ message: "Failed to confirm booking" });
+    }
+  });
+
+  // Calendar syncs routes
+  app.get('/api/properties/:propertyId/calendar-syncs', isAuthenticated, async (req: any, res) => {
+    try {
+      const syncs = await storage.getCalendarSyncs(req.params.propertyId);
+      res.json(syncs);
+    } catch (error) {
+      console.error("Error fetching calendar syncs:", error);
+      res.status(500).json({ message: "Failed to fetch calendar syncs" });
+    }
+  });
+
+  app.post('/api/properties/:propertyId/calendar-syncs', isAuthenticated, async (req: any, res) => {
+    try {
+      const validatedData = insertCalendarSyncSchema.parse({
+        ...req.body,
+        propertyId: req.params.propertyId,
+      });
+
+      const sync = await storage.createCalendarSync(validatedData);
+      res.status(201).json(sync);
+    } catch (error: any) {
+      console.error("Error creating calendar sync:", error);
+      res.status(400).json({ message: error.message || "Failed to create calendar sync" });
+    }
+  });
+
+  app.delete('/api/calendar-syncs/:id', isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteCalendarSync(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting calendar sync:", error);
+      res.status(500).json({ message: "Failed to delete calendar sync" });
+    }
+  });
+
+  // Reviews routes
+  app.get('/api/properties/:propertyId/reviews', async (req, res) => {
+    try {
+      const reviews = await storage.getPropertyReviews(req.params.propertyId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  app.post('/api/reviews', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validatedData = insertReviewSchema.parse({
+        ...req.body,
+        guestId: userId,
+      });
+
+      const review = await storage.createReview(validatedData);
+      res.status(201).json(review);
+    } catch (error: any) {
+      console.error("Error creating review:", error);
+      res.status(400).json({ message: error.message || "Failed to create review" });
+    }
+  });
 
   const httpServer = createServer(app);
-
   return httpServer;
 }

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Search, Menu, User, Heart, Home } from "lucide-react";
+import { Search, Menu, User as UserIcon, Heart, Home } from "lucide-react";
 import { useState } from "react";
 import {
   Sheet,
@@ -16,14 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+import type { User } from "@shared/schema";
+
 interface NavbarProps {
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    role: string;
-  } | null;
+  user?: User | null;
   onAuthClick: () => void;
   onLogout: () => void;
 }
@@ -92,14 +88,18 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || 'User'} />
+                      <AvatarFallback>
+                        {(user.firstName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium" data-testid="text-user-name">{user.name}</p>
+                    <p className="text-sm font-medium" data-testid="text-user-name">
+                      {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.email?.split('@')[0] || 'Utente'}
+                    </p>
                     <p className="text-xs text-muted-foreground" data-testid="text-user-email">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator />

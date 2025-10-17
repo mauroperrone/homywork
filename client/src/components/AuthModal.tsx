@@ -15,8 +15,8 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onOpenChange }: AuthModalProps) {
   const handleGoogleLogin = () => {
-    // Redirect to Replit Auth endpoint for Google login
-    window.location.href = "/api/auth/login";
+    // Redirect to Replit Auth endpoint
+    window.location.href = "/api/login";
   };
 
   return (
