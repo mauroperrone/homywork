@@ -85,7 +85,7 @@ Sistema per sincronizzare disponibilità con:
 - **Google Calendar**: Via OAuth e API nativa
 
 ### Design System
-- **Colori**: Rosso primario Airbnb-inspired, scala di grigi neutri
+- **Colori**: Viola primario (#9d4edd / 274° 68% 59%), Giallo accent (#ffde59 / 48° 100% 67%), scala di grigi neutri
 - **Tipografia**: Inter (sans-serif), Raleway (serif/headings)
 - **Componenti**: Sistema consistente con hover/active states
 - **Responsive**: Mobile-first con breakpoints ottimizzati

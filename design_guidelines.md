@@ -10,12 +10,13 @@
 - Primato visivo: le immagini delle proprietà guidano ogni decisione di design
 - Fiducia immediata: elementi di social proof e sicurezza ben visibili
 - Semplicità funzionale: ricerca e prenotazione senza attriti
-- Personalità calda: colori accoglienti, tipografia amichevole
+- Personalità moderna: viola elegante + giallo energetico, tipografia amichevole
 
 ## Color Palette
 
 **Light Mode**:
-- Primary Brand: 350 85% 50% (rosso caldo Airbnb-style)
+- Primary Brand: 274 68% 59% (viola moderno #9d4edd)
+- Accent: 48 100% 67% (giallo vibrante #ffde59)
 - Surface: 0 0% 100% (bianco puro)
 - Surface Secondary: 0 0% 98% (grigio chiaro)
 - Text Primary: 0 0% 13% (quasi nero)
@@ -24,7 +25,8 @@
 - Accent Success: 142 76% 36% (verde conferma)
 
 **Dark Mode**:
-- Primary Brand: 350 85% 55% (rosso leggermente più chiaro)
+- Primary Brand: 274 68% 65% (viola più chiaro)
+- Accent: 48 100% 72% (giallo più luminoso)
 - Surface: 0 0% 10% (grigio scuro)
 - Surface Secondary: 0 0% 15% (grigio secondario)
 - Text Primary: 0 0% 95% (bianco sporco)
