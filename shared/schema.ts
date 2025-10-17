@@ -115,7 +115,7 @@ export const insertPropertySchema = createInsertSchema(properties).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-  images: z.array(z.string()).min(1, "Almeno un'immagine è richiesta"),
+  images: z.array(z.string()).optional().default([]),
   amenities: z.array(z.string()),
   wifiSpeed: z.number().min(1, "Velocità WiFi deve essere almeno 1 Mbps").optional(),
 });

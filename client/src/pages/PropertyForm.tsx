@@ -103,7 +103,7 @@ export default function PropertyForm() {
     setImageUrls(imageUrls.filter(img => img !== url));
   };
 
-  const handleGetUploadParameters = async () => {
+  const handleGetUploadParameters = async (file: any) => {
     const response: any = await apiRequest("POST", "/api/objects/upload", {});
     return {
       method: "PUT" as const,
@@ -443,8 +443,8 @@ export default function PropertyForm() {
             </Button>
             <Button
               type="submit"
-              disabled={createPropertyMutation.isPending || imageUrls.length === 0}
-              data-testid="button-submit"
+              disabled={createPropertyMutation.isPending}
+              data-testid="button-submit-property"
             >
               {createPropertyMutation.isPending ? "Creazione..." : "Pubblica Proprietà"}
             </Button>

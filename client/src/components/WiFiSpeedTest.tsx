@@ -10,7 +10,7 @@ interface WiFiSpeedTestProps {
 }
 
 export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestProps) {
-  const [isTestin, setIsTesting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [speed, setSpeed] = useState<number | null>(currentSpeed || null);
 
