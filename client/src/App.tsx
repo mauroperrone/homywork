@@ -13,6 +13,7 @@ import SearchPage from "@/pages/SearchPage";
 import PropertyDetail from "@/pages/PropertyDetail";
 import PropertyForm from "@/pages/PropertyForm";
 import Dashboard from "@/pages/Dashboard";
+import Checkout from "@/pages/Checkout";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/proprieta/nuova" component={PropertyForm} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/diventa-host" component={PropertyForm} />
+      <Route path="/checkout" component={Checkout} />
       <Route component={NotFound} />
     </Switch>
   );

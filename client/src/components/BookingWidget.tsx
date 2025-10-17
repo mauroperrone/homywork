@@ -30,8 +30,17 @@ export function BookingWidget({ property }: BookingWidgetProps) {
   const total = subtotal + serviceFee;
 
   const handleReserve = () => {
-    // TODO: Navigate to checkout with booking details
-    console.log("Reserve", { checkIn, checkOut, guests });
+    if (!checkIn || !checkOut) return;
+    
+    const params = new URLSearchParams({
+      propertyId: property.id,
+      checkIn: checkIn.toISOString(),
+      checkOut: checkOut.toISOString(),
+      guests: guests.toString(),
+      total: total.toString(),
+    });
+    
+    window.location.href = `/checkout?${params.toString()}`;
   };
 
   return (
