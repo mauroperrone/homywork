@@ -46,7 +46,7 @@ export interface IStorage {
   deleteCalendarSync(id: string): Promise<void>;
 
   // Reviews
-  getPropertyReviews(propertyId: string): Promise<Review[]>;
+  getPropertyReviews(propertyId: string): Promise<any[]>;
   createReview(review: InsertReview): Promise<Review>;
   getPropertyAverageRating(propertyId: string): Promise<number>;
 }
@@ -265,10 +265,26 @@ export class DbStorage implements IStorage {
   }
 
   // Reviews
-  async getPropertyReviews(propertyId: string): Promise<Review[]> {
-    return await db.select().from(reviews)
+  async getPropertyReviews(propertyId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        review: reviews,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        },
+      })
+      .from(reviews)
+      .innerJoin(users, eq(reviews.guestId, users.id))
       .where(eq(reviews.propertyId, propertyId))
       .orderBy(desc(reviews.createdAt));
+
+    return result.map(r => ({
+      ...r.review,
+      user: r.user,
+    }));
   }
 
   async createReview(review: InsertReview): Promise<Review> {

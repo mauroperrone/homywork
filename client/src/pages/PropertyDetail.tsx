@@ -19,6 +19,7 @@ import {
 import type { PropertyWithHost } from "@shared/schema";
 import { useState } from "react";
 import { BookingWidget } from "@/components/BookingWidget";
+import { ReviewCard } from "@/components/ReviewCard";
 
 export default function PropertyDetail() {
   const [, params] = useRoute("/proprieta/:id");
@@ -26,6 +27,11 @@ export default function PropertyDetail() {
 
   const { data: property, isLoading } = useQuery<PropertyWithHost>({
     queryKey: [`/api/properties/${propertyId}`],
+    enabled: !!propertyId,
+  });
+
+  const { data: reviews = [] } = useQuery<any[]>({
+    queryKey: ["/api/properties", propertyId, "reviews"],
     enabled: !!propertyId,
   });
 
@@ -186,6 +192,30 @@ export default function PropertyDetail() {
                 </div>
               </div>
             </Card>
+
+            {/* Reviews */}
+            {reviews.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold">
+                    Recensioni ({reviews.length})
+                  </h2>
+                  {property.averageRating && (
+                    <div className="flex items-center gap-2">
+                      <Star className="h-5 w-5 fill-primary text-primary" />
+                      <span className="font-semibold">
+                        {property.averageRating.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {reviews.map((review) => (
+                    <ReviewCard key={review.id} review={review} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Booking Widget */}
