@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WiFiSpeedTest } from "@/components/WiFiSpeedTest";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { useState } from "react";
 import { Plus, X, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import type { UploadResult } from "@uppy/core";
 
 const AMENITIES_OPTIONS = [
   "WiFi", "Parcheggio", "Cucina", "Lavatrice", "Aria condizionata",
@@ -49,7 +51,6 @@ export default function PropertyForm() {
   const [wifiSpeed, setWifiSpeed] = useState<number>();
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [newImageUrl, setNewImageUrl] = useState("");
 
   const form = useForm<InsertProperty>({
     resolver: zodResolver(insertPropertySchema),
@@ -98,15 +99,39 @@ export default function PropertyForm() {
     );
   };
 
-  const addImageUrl = () => {
-    if (newImageUrl && !imageUrls.includes(newImageUrl)) {
-      setImageUrls([...imageUrls, newImageUrl]);
-      setNewImageUrl("");
-    }
-  };
-
   const removeImage = (url: string) => {
     setImageUrls(imageUrls.filter(img => img !== url));
+  };
+
+  const handleGetUploadParameters = async () => {
+    const response: any = await apiRequest("POST", "/api/objects/upload", {});
+    return {
+      method: "PUT" as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    const uploadedUrls: string[] = [];
+    
+    for (const file of result.successful) {
+      try {
+        const response: any = await apiRequest("POST", "/api/property-images", {
+          imageURL: file.uploadURL,
+        });
+        uploadedUrls.push(response.objectPath);
+      } catch (error) {
+        console.error("Error setting image ACL:", error);
+      }
+    }
+    
+    if (uploadedUrls.length > 0) {
+      setImageUrls(prev => [...prev, ...uploadedUrls]);
+      toast({
+        title: "Immagini caricate!",
+        description: `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'immagine caricata' : 'immagini caricate'} con successo.`,
+      });
+    }
   };
 
   const onSubmit = (data: InsertProperty) => {
@@ -371,17 +396,19 @@ export default function PropertyForm() {
 
           {/* Images */}
           <Card className="p-6 space-y-4">
-            <h2 className="text-xl font-semibold">Foto della Proprietà</h2>
-            <div className="flex gap-2">
-              <Input
-                placeholder="URL immagine"
-                value={newImageUrl}
-                onChange={(e) => setNewImageUrl(e.target.value)}
-                data-testid="input-image-url"
-              />
-              <Button type="button" onClick={addImageUrl} variant="outline" data-testid="button-add-image">
-                <Plus className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Foto della Proprietà</h2>
+              <ObjectUploader
+                maxNumberOfFiles={10}
+                maxFileSize={10485760}
+                allowedFileTypes={["image/*"]}
+                onGetUploadParameters={handleGetUploadParameters}
+                onComplete={handleUploadComplete}
+                buttonClassName="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Carica Immagini</span>
+              </ObjectUploader>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -405,7 +432,7 @@ export default function PropertyForm() {
             {imageUrls.length === 0 && (
               <div className="text-center py-12 border-2 border-dashed rounded-lg">
                 <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Aggiungi almeno un'immagine</p>
+                <p className="text-muted-foreground">Aggiungi almeno un'immagine della proprietà</p>
               </div>
             )}
           </Card>
