@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Property } from "@shared/schema";
 import { Link } from "wouter";
 import { MapPin, Shield, Calendar, Wifi } from "lucide-react";
-import heroImage from "@assets/generated_images/Italian_coastal_villa_hero_bd619aa3.png";
+import heroImage from "@assets/generated_images/Smartworker_coastal_workspace_Italy_891e8f37.png";
 
 export default function HomePage() {
   const { data: properties, isLoading } = useQuery<Property[]>({
@@ -22,7 +22,7 @@ export default function HomePage() {
         <div className="absolute inset-0">
           <img
             src={heroImage}
-            alt="Villa italiana"
+            alt="Spazio di lavoro per smartworker con vista mare"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/60" />
