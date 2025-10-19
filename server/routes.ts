@@ -303,6 +303,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm booking after payment
   app.post('/api/bookings/:id/confirm', isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const existingBooking = await storage.getBooking(req.params.id);
+      
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (existingBooking.guestId !== userId) {
+        return res.status(403).json({ message: "Not authorized to confirm this booking" });
+      }
+
       const { paymentIntentId } = req.body;
       const booking = await storage.updateBookingStatus(
         req.params.id,
@@ -319,6 +330,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Calendar syncs routes
   app.get('/api/properties/:propertyId/calendar-syncs', isHost, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const property = await storage.getProperty(req.params.propertyId);
+      
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      if (property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to access calendar syncs for this property" });
+      }
+
       const syncs = await storage.getCalendarSyncs(req.params.propertyId);
       res.json(syncs);
     } catch (error) {
@@ -329,6 +351,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/properties/:propertyId/calendar-syncs', isHost, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const property = await storage.getProperty(req.params.propertyId);
+      
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      if (property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to create calendar syncs for this property" });
+      }
+
       const validatedData = insertCalendarSyncSchema.parse({
         ...req.body,
         propertyId: req.params.propertyId,
@@ -342,8 +375,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/calendar-syncs/:id', isHost, async (req, res) => {
+  app.delete('/api/calendar-syncs/:id', isHost, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const sync = await storage.getCalendarSync(req.params.id);
+      
+      if (!sync) {
+        return res.status(404).json({ message: "Calendar sync not found" });
+      }
+      
+      const property = await storage.getProperty(sync.propertyId);
+      if (!property || property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to delete this calendar sync" });
+      }
+
       await storage.deleteCalendarSync(req.params.id);
       res.status(204).send();
     } catch (error) {

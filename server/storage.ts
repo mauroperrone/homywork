@@ -48,6 +48,7 @@ export interface IStorage {
   blockDates(propertyId: string, dates: Date[], source: string): Promise<void>;
   
   // Calendar Syncs
+  getCalendarSync(id: string): Promise<CalendarSync | undefined>;
   getCalendarSyncs(propertyId: string): Promise<CalendarSync[]>;
   createCalendarSync(sync: InsertCalendarSync): Promise<CalendarSync>;
   updateCalendarSync(id: string, sync: Partial<InsertCalendarSync>): Promise<CalendarSync | undefined>;
@@ -275,6 +276,11 @@ export class DbStorage implements IStorage {
   }
 
   // Calendar Syncs
+  async getCalendarSync(id: string): Promise<CalendarSync | undefined> {
+    const result = await db.select().from(calendarSyncs).where(eq(calendarSyncs.id, id)).limit(1);
+    return result[0];
+  }
+
   async getCalendarSyncs(propertyId: string): Promise<CalendarSync[]> {
     return await db.select().from(calendarSyncs).where(eq(calendarSyncs.propertyId, propertyId));
   }
