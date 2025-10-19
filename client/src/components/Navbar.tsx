@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import homyWorkLogo from "@assets/no FONDO yellow solo logo homywork PICCOLO_1760886467797.png";
 
 import type { User } from "@shared/schema";
 
@@ -34,8 +35,8 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md px-2 py-1 -ml-2" data-testid="link-home">
-            <Home className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold font-serif">CasaVacanza</span>
+            <img src={homyWorkLogo} alt="HomyWork Logo" className="h-8 w-8" />
+            <span className="text-xl font-bold font-serif">HomyWork</span>
           </Link>
 
           {/* Desktop Navigation */}

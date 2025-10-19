@@ -1,7 +1,7 @@
-# CasaVacanza - Portale Affitti Brevi
+# HomyWork - Portale Affitti Brevi
 
 ## Panoramica
-Portale per affitti brevi in stile Airbnb con frontend completamente in italiano. L'applicazione permette agli utenti di cercare e prenotare proprietà, e agli host di registrare e gestire i propri immobili.
+HomyWork è un portale per affitti brevi con frontend completamente in italiano. L'applicazione permette agli utenti di cercare e prenotare proprietà, e agli host di registrare e gestire i propri immobili.
 
 ## Funzionalità Principali
 
@@ -22,7 +22,7 @@ Portale per affitti brevi in stile Airbnb con frontend completamente in italiano
 - Wouter per routing
 - TanStack Query per state management
 - Shadcn UI + Tailwind CSS per UI
-- Design Airbnb-inspired (colore primario: rosso 350° 85% 50%)
+- Design moderno con branding HomyWork (colori: viola #9d4edd e giallo #ffde59)
 
 ### Backend
 - Express.js con TypeScript
