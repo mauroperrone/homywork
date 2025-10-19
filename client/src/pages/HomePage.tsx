@@ -137,7 +137,7 @@ export default function HomePage() {
             Hai uno spazio perfetto per lo smartworking?
           </h2>
           <p className="text-lg max-w-2xl mx-auto opacity-90">
-            Condividi il tuo alloggio con nomadi digitali e smartworkers. WiFi certificato e guadagni sicuri
+            Trova ora il tuo alloggio con postazione di lavoro e wifi certificato
           </p>
           <Button
             size="lg"
