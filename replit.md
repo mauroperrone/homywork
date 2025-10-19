@@ -1,7 +1,7 @@
 # HomyWork - Portale Affitti Brevi
 
 ## Panoramica
-HomyWork è un portale per affitti brevi con frontend completamente in italiano. L'applicazione permette agli utenti di cercare e prenotare proprietà, e agli host di registrare e gestire i propri immobili.
+HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi digitali, con frontend completamente in italiano. L'applicazione permette di trovare alloggi con WiFi certificato e spazi ottimizzati per il lavoro da remoto, mentre gli host possono registrare e gestire proprietà pensate per chi lavora viaggiando.
 
 ## Funzionalità Principali
 

@@ -1,16 +1,16 @@
-# Design Guidelines - Portale Affitti Brevi (Stile Airbnb)
+# Design Guidelines - HomyWork (Portale per Smartworkers e Nomadi Digitali)
 
 ## Design Approach
 
-**Selected Approach**: Reference-Based Design ispirato ad Airbnb
+**Selected Approach**: Design orientato alla produttività per nomadi digitali
 
-**Rationale**: Il settore hospitality richiede un'esperienza visualmente accattivante che trasmetta fiducia, calore e desiderio. Airbnb definisce il gold standard per le piattaforme di affitto brevi con il suo design pulito, orientato alle immagini e focalizzato sull'esperienza utente.
+**Rationale**: HomyWork si rivolge a smartworkers e nomadi digitali che cercano alloggi per workation. Il design deve trasmettere professionalità, affidabilità del WiFi e comfort per chi lavora da remoto, con un'esperienza visivamente accattivante che enfatizza connettività, spazi di lavoro e produttività.
 
 **Core Principles**:
-- Primato visivo: le immagini delle proprietà guidano ogni decisione di design
-- Fiducia immediata: elementi di social proof e sicurezza ben visibili
-- Semplicità funzionale: ricerca e prenotazione senza attriti
-- Personalità moderna: viola elegante + giallo energetico, tipografia amichevole
+- WiFi al centro: la connessione veloce e certificata è il valore primario
+- Produttività e comfort: immagini di spazi di lavoro, non solo vacanze
+- Fiducia immediata: velocità WiFi verificata, calendari sincronizzati
+- Personalità moderna: viola elegante + giallo energetico per brand distintivo
 
 ## Color Palette
 
@@ -63,63 +63,66 @@
 
 **Navigation**:
 - Sticky header (sticky top-0 z-50) con backdrop blur
-- Logo + Search bar centrale + Menu utente destro
+- Logo HomyWork + Search bar centrale + Menu utente destro
 - Mobile: drawer menu con overlay scuro
 
 **Property Cards**:
 - Immagine full-width con aspect-ratio-[4/3]
-- Overlay gradient per prezzo in alto
-- Cuore preferiti in alto a destra
-- Info: località, rating stelle, prezzo/notte
+- Badge WiFi speed prominente
+- Info: località, rating stelle, prezzo/notte, velocità WiFi
 - Hover: subtle scale-105 transform
 
 **Search/Filters**:
 - Barra ricerca prominente in hero con campi: Dove | Check-in | Check-out | Ospiti
-- Filters drawer/modal per: Tipo proprietà, Prezzo, WiFi speed, Servizi
+- Filters drawer/modal per: Tipo proprietà, Prezzo, **WiFi speed minima**, Servizi
 - Tags attivi visibili e rimovibili
 
 **Booking Flow**:
 - Sidebar fissa con riepilogo prezzo
 - Calendario inline con date disabilitate (sincronizzazione Airbnb/Booking)
+- **Badge WiFi certificato ben visibile**
 - CTA primario grande e sempre visibile
-- Trust badges: "Cancellazione flessibile", "Pagamento sicuro Stripe"
+- Trust badges: "WiFi Certificato", "Pagamento sicuro Stripe"
 
 **Image Galleries**:
 - Hero: Griglia asimmetrica (1 grande + 4 piccole)
+- **Includere immagini di spazi di lavoro/desk setup**
 - Lightbox fullscreen per visualizzazione
 - Thumbnails navigation bottom
 
 **Authentication**:
 - Modal centrato con Google/Apple buttons prominenti
 - Design minimalista con focus sui provider sociali
-- Illustrazione fiducia a lato (desktop)
+- Messaggio "Inizia la tua workation"
 
 **Dashboard Proprietario**:
 - Sidebar navigation sinistra
 - Cards per metriche: Prenotazioni, Guadagni, Occupazione
+- **WiFi Speed Test tool prominente**
 - Tabella prenotazioni con stati colorati
 - Calendario sincronizzato in evidenza
 
 ## Images Strategy
 
 **Hero Section**: 
-- Full-width hero image (h-[70vh]) mostrando destinazione iconica italiana
-- Overlay gradient scuro (from-black/50 to-transparent)
+- Full-width hero image (h-[70vh]) mostrando **smartworker che lavora con vista**
+- Overlay gradient scuro (from-black/60 to-transparent)
 - Search bar centrata sopra l'immagine
 
 **Property Listings**:
-- Ogni card con immagine proprietà di alta qualità
+- Ogni card con immagine che mostra **spazio di lavoro/desk quando possibile**
 - Ratio 4:3 per consistenza visiva
+- Badge WiFi speed overlay sull'immagine
 - Lazy loading per performance
 
 **Trust Sections**:
-- Foto autentiche di host e ospiti nelle recensioni
-- Icone illustrative per servizi e caratteristiche
-- Screenshots dashboard per sezione proprietari
+- Foto autentiche di nomadi digitali che lavorano negli alloggi
+- Icone illustrative per WiFi, workspace, servizi
+- Screenshots WiFi speed test nelle recensioni
 
 **Additional Images**:
-- Sezione "Come funziona": illustrazioni step-by-step del processo
-- Footer: mappa Italia stilizzata mostrando copertura
+- Sezione "Come funziona": illustrazioni step-by-step con focus su WiFi test
+- Sezione "Perché HomyWork": immagini di remote workers in location italiane
 
 ## Animations
 
@@ -127,23 +130,33 @@
 - Card hover: subtle scale (scale-105) con transition-transform
 - Image loading: fade-in con skeleton placeholder
 - Modal/Drawer: slide-in con backdrop fade
+- WiFi speed indicator: animated progress bar
 - NO scroll animations, NO complex transitions
 
 ## Distinctive Elements
 
 **Italian Localization**:
-- Copy warm e accogliente: "Trova la tua casa perfetta", "Benvenuto nella community"
+- Copy professionale ma friendly: "Lavora da dove vuoi", "La tua workstation con vista"
 - Formati data europei (gg/mm/aaaa)
 - Euro currency (€) sempre visibile
+- Terminologia workation: "workation", "smartworking", "nomadi digitali"
 
 **Trust Indicators**:
-- Badge "WiFi Certificato" con speedtest results prominente
+- **Badge "WiFi Certificato" con velocità prominente e colorato**
 - "Sincronizzato con Airbnb/Booking" label sui calendari
 - "Pagamenti sicuri Stripe" in checkout
+- Icone workspace/desk quando disponibili
 
 **Unique Features UI**:
-- WiFi speedtest widget durante registrazione immobile (gauge visual)
+- **WiFi speedtest widget durante registrazione immobile con gauge visual (feature chiave)**
+- WiFi speed badge colorato su ogni property card (verde >50Mbps, giallo 20-50, rosso <20)
 - Calendar sync status indicators (verde = sincronizzato)
-- Google Calendar quick-add CTA nel dashboard
+- Workspace amenities checklist (scrivania, sedia ergonomica, luce naturale)
 
-Questo design bilancia l'ispirazione Airbnb con elementi unici per differenziare la piattaforma nel mercato italiano degli affitti brevi.
+**Target Audience Messaging**:
+- Hero: "Lavora da dove vuoi, vivi dove sogni"
+- Featured: "Workation in Evidenza"
+- CTA: Focus su host che offrono spazi per smartworking
+- WiFi sempre in primo piano in ogni comunicazione
+
+Questo design bilancia professionalità per il target smartworker/nomade digitale con l'attrattiva visiva delle location italiane, mantenendo il WiFi certificato come elemento differenziante chiave.

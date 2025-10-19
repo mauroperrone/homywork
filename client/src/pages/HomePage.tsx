@@ -30,10 +30,10 @@ export default function HomePage() {
 
         <div className="relative z-10 container mx-auto px-4 text-center text-white space-y-8">
           <h1 className="text-4xl md:text-6xl font-bold font-serif tracking-tight" data-testid="text-hero-title">
-            Trova la tua casa perfetta in Italia
+            Lavora da dove vuoi, vivi dove sogni
           </h1>
           <p className="text-lg md:text-xl max-w-2xl mx-auto text-white/90" data-testid="text-hero-subtitle">
-            Scopri affitti brevi verificati con WiFi certificato e pagamenti sicuri
+            Alloggi pensati per nomadi digitali e smartworkers con WiFi ad alta velocità certificato e spazi perfetti per la produttività
           </p>
           
           <SearchBar variant="hero" />
@@ -60,7 +60,7 @@ export default function HomePage() {
               </div>
               <div>
                 <h3 className="font-semibold mb-1">WiFi Certificato</h3>
-                <p className="text-sm text-muted-foreground">Velocità misurata e verificata</p>
+                <p className="text-sm text-muted-foreground">Velocità garantita per lavorare</p>
               </div>
             </div>
 
@@ -93,10 +93,10 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-3xl font-bold font-serif mb-2" data-testid="text-featured-title">
-                Proprietà in Evidenza
+                Workation in Evidenza
               </h2>
               <p className="text-muted-foreground">
-                Scopri le case vacanza più richieste
+                Le destinazioni preferite dai nomadi digitali
               </p>
             </div>
             <Button variant="outline" asChild data-testid="button-view-all">
@@ -134,10 +134,10 @@ export default function HomePage() {
       <section className="py-20 bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 text-center space-y-6">
           <h2 className="text-3xl md:text-4xl font-bold font-serif" data-testid="text-cta-title">
-            Vuoi diventare Host?
+            Hai uno spazio perfetto per lo smartworking?
           </h2>
           <p className="text-lg max-w-2xl mx-auto opacity-90">
-            Condividi la tua casa e inizia a guadagnare con affitti brevi sicuri e verificati
+            Condividi il tuo alloggio con nomadi digitali e smartworkers. WiFi veloce certificato e guadagni sicuri
           </p>
           <Button
             size="lg"
