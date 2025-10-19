@@ -3,6 +3,37 @@
 ## Panoramica
 HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi digitali, con frontend completamente in italiano. L'applicazione permette di trovare alloggi con WiFi certificato e spazi ottimizzati per il lavoro da remoto, mentre gli host possono registrare e gestire proprietà pensate per chi lavora viaggiando.
 
+## 🔐 Sistema di Sicurezza Implementato (Ottobre 2025)
+
+### Middleware Role-Based
+- **`isHost`**: Verifica che l'utente abbia ruolo 'host' prima di accedere a risorse host
+- **`isGuest`**: Verifica che l'utente abbia ruolo 'guest'
+- **`isAdmin`**: Verifica che l'utente abbia ruolo 'admin' per operazioni amministrative
+
+### Ruoli Utente
+- **guest** (predefinito) - Utente che può cercare e prenotare alloggi
+- **host** - Utente che può pubblicare e gestire proprietà
+- **admin** - Amministratore con accesso a pannello di gestione
+
+### Route Guards Frontend
+Implementati controlli di accesso lato client usando componente `ProtectedRoute`:
+- `/proprieta/nuova` → solo host
+- `/dashboard` → solo host
+- `/admin` → solo admin
+- `/checkout` → richiede autenticazione
+
+### Protezione Granulare (Ownership)
+Tutte le operazioni sensibili verificano che l'utente sia il proprietario della risorsa:
+- ✅ Modifica/eliminazione proprietà → verifica `hostId === userId`
+- ✅ Gestione calendar syncs → verifica ownership proprietà
+- ✅ Conferma prenotazioni → verifica `guestId === userId`
+
+### Pannello Amministrazione
+Accessibile solo ad admin su `/admin`:
+- Gestione utenti (visualizza e modifica ruoli)
+- Gestione proprietà (visualizza tutte, attiva/disattiva)
+- Statistiche piattaforma
+
 ## Funzionalità Principali
 
 ### Per gli Ospiti
@@ -50,29 +81,34 @@ HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi
 - `POST /api/auth/become-host` - Diventa host
 
 ### Properties
-- `GET /api/properties` - Lista tutte le proprietà
-- `GET /api/properties/:id` - Dettagli proprietà con host e reviews
-- `POST /api/properties` - Crea nuova proprietà (richiede auth)
-- `PATCH /api/properties/:id` - Aggiorna proprietà (richiede auth)
-- `DELETE /api/properties/:id` - Elimina proprietà (richiede auth)
-- `GET /api/host/properties` - Proprietà dell'host (richiede auth)
+- `GET /api/properties` - Lista tutte le proprietà (pubblico)
+- `GET /api/properties/:id` - Dettagli proprietà con host e reviews (pubblico)
+- `POST /api/properties` - Crea nuova proprietà (richiede ruolo **host**)
+- `PATCH /api/properties/:id` - Aggiorna proprietà (richiede ruolo **host** + ownership)
+- `DELETE /api/properties/:id` - Elimina proprietà (richiede ruolo **host** + ownership)
+- `GET /api/host/properties` - Proprietà dell'host (richiede ruolo **host**)
 
 ### Bookings
-- `GET /api/bookings/:id` - Dettagli prenotazione
 - `GET /api/guest/bookings` - Prenotazioni ospite (richiede auth)
-- `GET /api/host/bookings` - Prenotazioni host (richiede auth)
+- `GET /api/host/bookings` - Prenotazioni host (richiede ruolo **host**)
 - `POST /api/bookings` - Crea prenotazione (richiede auth)
-- `POST /api/bookings/:id/confirm` - Conferma prenotazione dopo pagamento
-- `POST /api/create-payment-intent` - Crea Stripe payment intent
+- `POST /api/bookings/:id/confirm` - Conferma prenotazione dopo pagamento (richiede auth + ownership)
+- `POST /api/create-payment-intent` - Crea Stripe payment intent (richiede auth)
 
 ### Calendar Syncs
-- `GET /api/properties/:propertyId/calendar-syncs` - Lista sync
-- `POST /api/properties/:propertyId/calendar-syncs` - Crea sync
-- `DELETE /api/calendar-syncs/:id` - Elimina sync
+- `GET /api/properties/:propertyId/calendar-syncs` - Lista sync (richiede ruolo **host** + ownership)
+- `POST /api/properties/:propertyId/calendar-syncs` - Crea sync (richiede ruolo **host** + ownership)
+- `DELETE /api/calendar-syncs/:id` - Elimina sync (richiede ruolo **host** + ownership)
 
 ### Reviews
-- `GET /api/properties/:propertyId/reviews` - Reviews proprietà
+- `GET /api/properties/:propertyId/reviews` - Reviews proprietà (pubblico)
 - `POST /api/reviews` - Crea review (richiede auth)
+
+### Admin (richiede ruolo **admin**)
+- `GET /api/admin/users` - Lista tutti gli utenti
+- `GET /api/admin/properties` - Lista tutte le proprietà (anche inattive)
+- `PATCH /api/admin/users/:id/role` - Modifica ruolo utente
+- `PATCH /api/admin/properties/:id/status` - Attiva/disattiva proprietà
 
 ## Caratteristiche Speciali
 

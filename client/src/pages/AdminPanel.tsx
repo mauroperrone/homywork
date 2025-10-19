@@ -23,10 +23,8 @@ export default function AdminPanel() {
 
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      return await apiRequest<User>(`/api/admin/users/${userId}/role`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      });
+      const res = await apiRequest('PATCH', `/api/admin/users/${userId}/role`, { role });
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
@@ -46,10 +44,8 @@ export default function AdminPanel() {
 
   const updatePropertyStatusMutation = useMutation({
     mutationFn: async ({ propertyId, isActive }: { propertyId: string; isActive: boolean }) => {
-      return await apiRequest<Property>(`/api/admin/properties/${propertyId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ isActive }),
-      });
+      const res = await apiRequest('PATCH', `/api/admin/properties/${propertyId}/status`, { isActive });
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/properties'] });
