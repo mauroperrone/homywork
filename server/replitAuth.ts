@@ -83,17 +83,19 @@ export async function setupAuth(app: Express) {
 
   // Register strategies for all domains including .replit.dev and .repl.co variants
   const domains = process.env.REPLIT_DOMAINS!.split(",");
-  const allDomains = new Set<string>();
+  const allDomainsSet = new Set<string>();
   
   for (const domain of domains) {
-    allDomains.add(domain);
+    allDomainsSet.add(domain);
     // Add both .replit.dev and .repl.co variants
     if (domain.includes('.replit.dev')) {
-      allDomains.add(domain.replace('.replit.dev', '.repl.co'));
+      allDomainsSet.add(domain.replace('.replit.dev', '.repl.co'));
     } else if (domain.includes('.repl.co')) {
-      allDomains.add(domain.replace('.repl.co', '.replit.dev'));
+      allDomainsSet.add(domain.replace('.repl.co', '.replit.dev'));
     }
   }
+  
+  const allDomains = Array.from(allDomainsSet);
   
   for (const domain of allDomains) {
     const strategy = new Strategy(
