@@ -17,6 +17,9 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserRole(userId: string, role: string): Promise<User | undefined>;
 
+  // Admin - User Management
+  getAllUsers(): Promise<User[]>;
+
   // Properties
   getProperty(id: string): Promise<Property | undefined>;
   getPropertyWithHost(id: string): Promise<PropertyWithHost | undefined>;
@@ -25,6 +28,10 @@ export interface IStorage {
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<InsertProperty>): Promise<Property | undefined>;
   deleteProperty(id: string): Promise<void>;
+
+  // Admin - Property Management
+  getAllPropertiesAdmin(): Promise<Property[]>;
+  updatePropertyStatus(id: string, isActive: boolean): Promise<Property | undefined>;
 
   // Bookings
   getBooking(id: string): Promise<Booking | undefined>;
@@ -92,6 +99,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  // Admin - User Management
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   // Properties
   async getProperty(id: string): Promise<Property | undefined> {
     const result = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
@@ -145,6 +157,19 @@ export class DbStorage implements IStorage {
 
   async deleteProperty(id: string): Promise<void> {
     await db.delete(properties).where(eq(properties.id, id));
+  }
+
+  // Admin - Property Management
+  async getAllPropertiesAdmin(): Promise<Property[]> {
+    return await db.select().from(properties).orderBy(desc(properties.createdAt));
+  }
+
+  async updatePropertyStatus(id: string, isActive: boolean): Promise<Property | undefined> {
+    const result = await db.update(properties)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(properties.id, id))
+      .returning();
+    return result[0];
   }
 
   // Bookings

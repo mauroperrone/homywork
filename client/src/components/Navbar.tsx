@@ -52,6 +52,11 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                 Dashboard
               </Link>
             )}
+            {user?.role === "admin" && (
+              <Link href="/admin" className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${location === "/admin" ? "text-foreground" : "text-muted-foreground"}`} data-testid="link-admin">
+                Admin
+              </Link>
+            )}
           </nav>
 
           {/* Right Side Actions */}
@@ -115,6 +120,11 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                       <Link href="/dashboard" data-testid="link-dashboard-menu">Dashboard Host</Link>
                     </DropdownMenuItem>
                   )}
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" data-testid="link-admin-menu">Pannello Admin</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onLogout} data-testid="button-logout">
                     Esci
@@ -160,6 +170,16 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                       data-testid="link-dashboard-mobile"
                     >
                       Dashboard
+                    </Link>
+                  )}
+                  {user?.role === "admin" && (
+                    <Link
+                      href="/admin"
+                      className="text-lg font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="link-admin-mobile"
+                    >
+                      Admin
                     </Link>
                   )}
                   {user && (
