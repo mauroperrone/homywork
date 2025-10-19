@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isHost, isGuest, isAdmin } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import Stripe from "stripe";
@@ -145,16 +145,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/properties', isAuthenticated, async (req: any, res) => {
+  app.post('/api/properties', isHost, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const validatedData = insertPropertySchema.parse({
         ...req.body,
         hostId: userId,
       });
-      
-      // Update user role to host if not already
-      await storage.updateUserRole(userId, 'host');
       
       const property = await storage.createProperty(validatedData);
       res.status(201).json(property);
@@ -164,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/properties/:id', isHost, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const property = await storage.getProperty(req.params.id);
@@ -185,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/properties/:id', isHost, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const property = await storage.getProperty(req.params.id);
@@ -207,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Host-specific properties
-  app.get('/api/host/properties', isAuthenticated, async (req: any, res) => {
+  app.get('/api/host/properties', isHost, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const properties = await storage.getHostProperties(userId);
@@ -243,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/host/bookings', isAuthenticated, async (req: any, res) => {
+  app.get('/api/host/bookings', isHost, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const bookings = await storage.getHostBookings(userId);
@@ -320,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar syncs routes
-  app.get('/api/properties/:propertyId/calendar-syncs', isAuthenticated, async (req: any, res) => {
+  app.get('/api/properties/:propertyId/calendar-syncs', isHost, async (req: any, res) => {
     try {
       const syncs = await storage.getCalendarSyncs(req.params.propertyId);
       res.json(syncs);
@@ -330,7 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/properties/:propertyId/calendar-syncs', isAuthenticated, async (req: any, res) => {
+  app.post('/api/properties/:propertyId/calendar-syncs', isHost, async (req: any, res) => {
     try {
       const validatedData = insertCalendarSyncSchema.parse({
         ...req.body,
@@ -345,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/calendar-syncs/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/calendar-syncs/:id', isHost, async (req, res) => {
     try {
       await storage.deleteCalendarSync(req.params.id);
       res.status(204).send();

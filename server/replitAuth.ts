@@ -151,3 +151,78 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+// Middleware per verificare che l'utente sia un host
+export const isHost: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+
+  if (!req.isAuthenticated() || !user.claims?.sub) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const dbUser = await storage.getUser(user.claims.sub);
+    if (!dbUser) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    if (dbUser.role !== "host") {
+      return res.status(403).json({ message: "Forbidden: Host role required" });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("Error checking host role:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Middleware per verificare che l'utente sia un guest
+export const isGuest: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+
+  if (!req.isAuthenticated() || !user.claims?.sub) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const dbUser = await storage.getUser(user.claims.sub);
+    if (!dbUser) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    if (dbUser.role !== "guest") {
+      return res.status(403).json({ message: "Forbidden: Guest role required" });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("Error checking guest role:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Middleware per verificare che l'utente sia un admin
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  const user = req.user as any;
+
+  if (!req.isAuthenticated() || !user.claims?.sub) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const dbUser = await storage.getUser(user.claims.sub);
+    if (!dbUser) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    if (dbUser.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden: Admin role required" });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("Error checking admin role:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
