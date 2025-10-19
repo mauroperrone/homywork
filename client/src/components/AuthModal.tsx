@@ -29,10 +29,10 @@ export function AuthModal({ open, onOpenChange }: AuthModalProps) {
             </div>
           </div>
           <DialogTitle className="text-center text-2xl" data-testid="text-auth-title">
-            Benvenuto su CasaVacanza
+            Benvenuto su HomyWork
           </DialogTitle>
           <DialogDescription className="text-center">
-            Accedi per prenotare la tua casa vacanza perfetta o iniziare ad ospitare
+            Accedi per trovare il tuo spazio di lavoro ideale o iniziare ad ospitare smartworker
           </DialogDescription>
         </DialogHeader>
 

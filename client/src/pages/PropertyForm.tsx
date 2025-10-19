@@ -151,7 +151,7 @@ export default function PropertyForm() {
           Registra la tua Proprietà
         </h1>
         <p className="text-muted-foreground">
-          Inserisci i dettagli della tua casa vacanza per iniziare ad accogliere ospiti
+          Inserisci i dettagli del tuo alloggio per smartworker e inizia ad accogliere nomadi digitali
         </p>
       </div>
 
