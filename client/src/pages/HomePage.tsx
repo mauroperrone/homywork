@@ -33,7 +33,7 @@ export default function HomePage() {
             Lavora da dove vuoi, vivi dove sogni
           </h1>
           <p className="text-lg md:text-xl max-w-2xl mx-auto text-white/90" data-testid="text-hero-subtitle">
-            Alloggi pensati per nomadi digitali e smartworkers con WiFi ad alta velocità certificato e spazi perfetti per la produttività
+            Alloggi pensati per nomadi digitali e smartworkers con WiFi certificato e spazi perfetti per la produttività
           </p>
           
           <SearchBar variant="hero" />
