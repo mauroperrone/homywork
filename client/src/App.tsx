@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Navbar } from "@/components/Navbar";
 import { AuthModal } from "@/components/AuthModal";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 
@@ -23,11 +24,27 @@ function Router() {
       <Route path="/" component={HomePage} />
       <Route path="/cerca" component={SearchPage} />
       <Route path="/proprieta/:id" component={PropertyDetail} />
-      <Route path="/proprieta/nuova" component={PropertyForm} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/proprieta/nuova">
+        <ProtectedRoute requiredRole="host">
+          <PropertyForm />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard">
+        <ProtectedRoute requiredRole="host">
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
       <Route path="/diventa-host" component={PropertyForm} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/admin" component={AdminPanel} />
+      <Route path="/checkout">
+        <ProtectedRoute requireAuth>
+          <Checkout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute requiredRole="admin">
+          <AdminPanel />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
