@@ -36,7 +36,7 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md px-2 py-1 -ml-2" data-testid="link-home">
             <img src={homyWorkLogo} alt="HomyWork Logo" className="h-8 w-8" />
-            <span className="text-xl font-bold font-serif">HomyWork</span>
+            <span className="text-xl font-bold font-ubuntu">HomyWork</span>
           </Link>
 
           {/* Desktop Navigation */}

@@ -38,6 +38,7 @@
 **Font Families**:
 - Primary: 'Inter' via Google Fonts - moderna, leggibile, professionale
 - Secondary: 'Raleway' per titoli hero e sezioni speciali
+- Brand: 'Ubuntu' per il logo HomyWork - carattere distintivo del brand
 
 **Type Scale**:
 - Hero: text-6xl (60px) font-bold tracking-tight

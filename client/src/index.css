@@ -78,6 +78,7 @@
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-serif: 'Raleway', 'Inter', Georgia, serif;
+  --font-ubuntu: 'Ubuntu', 'Inter', sans-serif;
   --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
   --radius: .5rem;
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.05);
