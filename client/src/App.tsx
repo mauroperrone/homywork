@@ -16,6 +16,7 @@ import PropertyForm from "@/pages/PropertyForm";
 import Dashboard from "@/pages/Dashboard";
 import Checkout from "@/pages/Checkout";
 import AdminPanel from "@/pages/AdminPanel";
+import UserProfile from "@/pages/UserProfile";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -43,6 +44,11 @@ function Router() {
       <Route path="/admin">
         <ProtectedRoute requiredRole="admin">
           <AdminPanel />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/profilo">
+        <ProtectedRoute requireAuth>
+          <UserProfile />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
