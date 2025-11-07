@@ -6,22 +6,36 @@ HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi
 ## 🔧 Bug Fix Critici (Novembre 2025)
 
 ### Problema: Upload Foto Proprietà Non Funzionante
-**Issue**: Gli host non riuscivano a caricare foto durante l'inserimento di nuove proprietà.
+**Issue**: Gli host non riuscivano a caricare foto durante l'inserimento di nuove proprietà. Errore: `[Uppy] Cannot upload to an undefined URL`.
 
 **Root Cause**:
-- Il codice usava `file.uploadURL` invece di `file.response.uploadURL`
-- Secondo la documentazione Uppy AwsS3, l'URL dell'upload si trova in `file.response.uploadURL`
-- Questo causava il fallimento silente dell'upload, senza salvare le immagini
+- `apiRequest()` restituisce un oggetto `Response` (Fetch API), non il JSON parsed
+- Il codice chiamava `response.uploadURL` direttamente sull'oggetto Response invece di fare `await response.json()` prima
+- Questo causava `uploadURL` undefined, impedendo l'upload a GCS
 
 **Fix Implementata**:
-1. **Corretto accesso alla proprietà uploadURL**: Modificato `handleUploadComplete` per usare `file.response.uploadURL`
-2. **Aggiunto controllo di sicurezza**: Verifica che `file.response?.uploadURL` esista prima di procedere
-3. **Migliorati messaggi errore**: Toast informativo se alcune immagini non vengono caricate correttamente
+1. **handleGetUploadParameters**: Aggiunto `await response.json()` per parsare il JSON dal backend
+   ```typescript
+   const response = await apiRequest("POST", "/api/objects/upload", {});
+   const data = await response.json();  // Parse JSON!
+   return { method: "PUT", url: data.uploadURL };
+   ```
+
+2. **handleUploadComplete**: Aggiunto `await response.json()` per ottenere l'objectPath
+   ```typescript
+   const response = await apiRequest("POST", "/api/property-images", {...});
+   const data = await response.json();  // Parse JSON!
+   uploadedUrls.push(data.objectPath);
+   ```
+
+3. **Gestione errori aggregata**: Toast riepilogativo per file falliti invece di uno per ogni errore
 
 **Impact**:
-- ✅ Upload foto funzionante
-- ✅ Gestione errori migliorata con feedback chiaro all'utente
-- ✅ Log dettagliati per debugging
+- ✅ Upload foto completamente funzionante (test end-to-end passato)
+- ✅ File caricati da locale (mobile e desktop) con drag&drop o selezione
+- ✅ Anteprime visibili nel form
+- ✅ Immagini salvate su Google Cloud Storage con ACL pubblico
+- ✅ Gestione errori user-friendly
 
 ### Problema: Flusso Registrazione Host Rotto
 **Issue**: Utenti guest che tentavano di pubblicare proprietà ricevevano errore 403 generico senza capire il motivo.
