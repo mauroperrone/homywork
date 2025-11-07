@@ -130,14 +130,26 @@ export default function PropertyForm() {
     if (result.successful) {
       for (const file of result.successful) {
         try {
-          if (!file.response?.uploadURL) {
-            console.error("File upload missing response URL:", file);
+          // Debug: Log tutta la struttura del file
+          console.log("=== FILE OBJECT ===");
+          console.log("file.name:", file.name);
+          console.log("file.uploadURL:", file.uploadURL);
+          console.log("file.response:", file.response);
+          console.log("file keys:", Object.keys(file));
+          
+          // Prova a trovare l'URL in vari posti
+          const uploadURL = file.uploadURL || file.response?.uploadURL || file.response?.body?.location;
+          
+          if (!uploadURL) {
+            console.error("File upload missing URL. Full file object:", JSON.stringify(file, null, 2));
             failedCount++;
             continue;
           }
           
+          console.log("Using uploadURL:", uploadURL);
+          
           const response: any = await apiRequest("POST", "/api/property-images", {
-            imageURL: file.response.uploadURL,
+            imageURL: uploadURL,
           });
           uploadedUrls.push(response.objectPath);
         } catch (error) {
