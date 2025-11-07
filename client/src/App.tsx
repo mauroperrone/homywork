@@ -17,6 +17,7 @@ import Dashboard from "@/pages/Dashboard";
 import Checkout from "@/pages/Checkout";
 import AdminPanel from "@/pages/AdminPanel";
 import UserProfile from "@/pages/UserProfile";
+import BecomeHost from "@/pages/BecomeHost";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,7 +36,11 @@ function Router() {
           <Dashboard />
         </ProtectedRoute>
       </Route>
-      <Route path="/diventa-host" component={PropertyForm} />
+      <Route path="/diventa-host">
+        <ProtectedRoute requireAuth>
+          <BecomeHost />
+        </ProtectedRoute>
+      </Route>
       <Route path="/checkout">
         <ProtectedRoute requireAuth>
           <Checkout />

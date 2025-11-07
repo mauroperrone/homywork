@@ -82,12 +82,24 @@ export default function PropertyForm() {
       });
       navigate("/dashboard");
     },
-    onError: () => {
-      toast({
-        title: "Errore",
-        description: "Si è verificato un errore durante la creazione della proprietà.",
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      const errorMessage = error?.message || "";
+      const is403 = errorMessage.includes("403") || errorMessage.includes("Forbidden") || errorMessage.includes("Host role required");
+      
+      if (is403) {
+        toast({
+          title: "Accesso negato",
+          description: "Devi essere un host per pubblicare proprietà. Vai su 'Diventa Host' per iniziare.",
+          variant: "destructive",
+        });
+        navigate("/diventa-host");
+      } else {
+        toast({
+          title: "Errore",
+          description: "Si è verificato un errore durante la creazione della proprietà.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -114,14 +126,16 @@ export default function PropertyForm() {
   const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     const uploadedUrls: string[] = [];
     
-    for (const file of result.successful) {
-      try {
-        const response: any = await apiRequest("POST", "/api/property-images", {
-          imageURL: file.uploadURL,
-        });
-        uploadedUrls.push(response.objectPath);
-      } catch (error) {
-        console.error("Error setting image ACL:", error);
+    if (result.successful) {
+      for (const file of result.successful) {
+        try {
+          const response: any = await apiRequest("POST", "/api/property-images", {
+            imageURL: file.uploadURL,
+          });
+          uploadedUrls.push(response.objectPath);
+        } catch (error) {
+          console.error("Error setting image ACL:", error);
+        }
       }
     }
     
