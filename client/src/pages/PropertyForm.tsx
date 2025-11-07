@@ -125,21 +125,24 @@ export default function PropertyForm() {
 
   const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     const uploadedUrls: string[] = [];
+    let failedCount = 0;
     
     if (result.successful) {
       for (const file of result.successful) {
         try {
+          if (!file.response?.uploadURL) {
+            console.error("File upload missing response URL:", file);
+            failedCount++;
+            continue;
+          }
+          
           const response: any = await apiRequest("POST", "/api/property-images", {
             imageURL: file.response.uploadURL,
           });
           uploadedUrls.push(response.objectPath);
         } catch (error) {
           console.error("Error setting image ACL:", error);
-          toast({
-            title: "Errore upload",
-            description: "Impossibile completare il caricamento di alcune immagini.",
-            variant: "destructive",
-          });
+          failedCount++;
         }
       }
     }
@@ -149,6 +152,14 @@ export default function PropertyForm() {
       toast({
         title: "Immagini caricate!",
         description: `${uploadedUrls.length} ${uploadedUrls.length === 1 ? 'immagine caricata' : 'immagini caricate'} con successo.`,
+      });
+    }
+    
+    if (failedCount > 0) {
+      toast({
+        title: "Attenzione",
+        description: `${failedCount} ${failedCount === 1 ? 'immagine non è stata caricata' : 'immagini non sono state caricate'}. Riprova.`,
+        variant: "destructive",
       });
     }
   };

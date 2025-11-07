@@ -5,6 +5,24 @@ HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi
 
 ## 🔧 Bug Fix Critici (Novembre 2025)
 
+### Problema: Upload Foto Proprietà Non Funzionante
+**Issue**: Gli host non riuscivano a caricare foto durante l'inserimento di nuove proprietà.
+
+**Root Cause**:
+- Il codice usava `file.uploadURL` invece di `file.response.uploadURL`
+- Secondo la documentazione Uppy AwsS3, l'URL dell'upload si trova in `file.response.uploadURL`
+- Questo causava il fallimento silente dell'upload, senza salvare le immagini
+
+**Fix Implementata**:
+1. **Corretto accesso alla proprietà uploadURL**: Modificato `handleUploadComplete` per usare `file.response.uploadURL`
+2. **Aggiunto controllo di sicurezza**: Verifica che `file.response?.uploadURL` esista prima di procedere
+3. **Migliorati messaggi errore**: Toast informativo se alcune immagini non vengono caricate correttamente
+
+**Impact**:
+- ✅ Upload foto funzionante
+- ✅ Gestione errori migliorata con feedback chiaro all'utente
+- ✅ Log dettagliati per debugging
+
 ### Problema: Flusso Registrazione Host Rotto
 **Issue**: Utenti guest che tentavano di pubblicare proprietà ricevevano errore 403 generico senza capire il motivo.
 
@@ -205,7 +223,7 @@ npm start
 ## Prossimi Passi
 
 ### Features da Completare
-1. Implementazione upload immagini con Object Storage
+1. ~~Implementazione upload immagini con Object Storage~~ ✅ **COMPLETATO**
 2. Logica sincronizzazione calendario iCal (parsing e aggiornamento availability)
 3. Sistema messaggistica host-guest
 4. Filtri avanzati ricerca (amenities, date availability)
