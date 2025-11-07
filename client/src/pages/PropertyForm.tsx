@@ -116,10 +116,11 @@ export default function PropertyForm() {
   };
 
   const handleGetUploadParameters = async (file: any) => {
-    const response: any = await apiRequest("POST", "/api/objects/upload", {});
+    const response = await apiRequest("POST", "/api/objects/upload", {});
+    const data = await response.json();
     return {
       method: "PUT" as const,
-      url: response.uploadURL,
+      url: data.uploadURL,
     };
   };
 
@@ -130,28 +131,20 @@ export default function PropertyForm() {
     if (result.successful) {
       for (const file of result.successful) {
         try {
-          // Debug: Log tutta la struttura del file
-          console.log("=== FILE OBJECT ===");
-          console.log("file.name:", file.name);
-          console.log("file.uploadURL:", file.uploadURL);
-          console.log("file.response:", file.response);
-          console.log("file keys:", Object.keys(file));
-          
-          // Prova a trovare l'URL in vari posti
-          const uploadURL = file.uploadURL || file.response?.uploadURL || file.response?.body?.location;
+          // L'URL del file caricato è in file.uploadURL dopo upload con AwsS3 plugin
+          const uploadURL = file.uploadURL;
           
           if (!uploadURL) {
-            console.error("File upload missing URL. Full file object:", JSON.stringify(file, null, 2));
+            console.error("File upload missing URL:", file.name);
             failedCount++;
             continue;
           }
           
-          console.log("Using uploadURL:", uploadURL);
-          
-          const response: any = await apiRequest("POST", "/api/property-images", {
+          const response = await apiRequest("POST", "/api/property-images", {
             imageURL: uploadURL,
           });
-          uploadedUrls.push(response.objectPath);
+          const data = await response.json();
+          uploadedUrls.push(data.objectPath);
         } catch (error) {
           console.error("Error setting image ACL:", error);
           failedCount++;
