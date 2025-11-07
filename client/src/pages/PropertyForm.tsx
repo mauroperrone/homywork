@@ -130,11 +130,16 @@ export default function PropertyForm() {
       for (const file of result.successful) {
         try {
           const response: any = await apiRequest("POST", "/api/property-images", {
-            imageURL: file.uploadURL,
+            imageURL: file.response.uploadURL,
           });
           uploadedUrls.push(response.objectPath);
         } catch (error) {
           console.error("Error setting image ACL:", error);
+          toast({
+            title: "Errore upload",
+            description: "Impossibile completare il caricamento di alcune immagini.",
+            variant: "destructive",
+          });
         }
       }
     }
