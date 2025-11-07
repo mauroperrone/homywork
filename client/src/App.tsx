@@ -25,12 +25,12 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/cerca" component={SearchPage} />
-      <Route path="/proprieta/:id" component={PropertyDetail} />
       <Route path="/proprieta/nuova">
         <ProtectedRoute requiredRole="host">
           <PropertyForm />
         </ProtectedRoute>
       </Route>
+      <Route path="/proprieta/:id" component={PropertyDetail} />
       <Route path="/dashboard">
         <ProtectedRoute requiredRole="host">
           <Dashboard />

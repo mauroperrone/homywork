@@ -6,9 +6,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Home, Calendar, Wifi, Shield } from "lucide-react";
+import { useEffect } from "react";
 
 export default function BecomeHost() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -32,13 +33,20 @@ export default function BecomeHost() {
     },
   });
 
-  if (!user) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (!user) {
+      navigate("/");
+      return;
+    }
 
-  if (user.role === "host" || user.role === "admin") {
-    navigate("/proprieta/nuova");
+    if (user.role === "host" || user.role === "admin") {
+      navigate("/proprieta/nuova");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading || !user || user.role === "host" || user.role === "admin") {
     return null;
   }
 

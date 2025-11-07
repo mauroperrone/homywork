@@ -3,6 +3,43 @@
 ## Panoramica
 HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi digitali, con frontend completamente in italiano. L'applicazione permette di trovare alloggi con WiFi certificato e spazi ottimizzati per il lavoro da remoto, mentre gli host possono registrare e gestire proprietà pensate per chi lavora viaggiando.
 
+## 🔧 Bug Fix Critici (Novembre 2025)
+
+### Problema: Flusso Registrazione Host Rotto
+**Issue**: Utenti guest che tentavano di pubblicare proprietà ricevevano errore 403 generico senza capire il motivo.
+
+**Root Cause**: 
+- L'API `/api/properties` richiede ruolo 'host' (middleware `isHost`)
+- Gli utenti si registravano come 'guest' (ruolo default)
+- Il pulsante "Diventa Host" portava direttamente al form proprietà
+- Il form falliva al submit senza spiegare perché
+
+**Fix Implementata**:
+1. **Creata pagina `/diventa-host`**: Pagina informativa con vantaggi e pulsante "Diventa Host Ora"
+   - Mostra benefici (guadagno extra, pagamenti sicuri, gestione calendario, WiFi certificato)
+   - Chiama `/api/auth/become-host` per upgrade del ruolo
+   - Reindirizza automaticamente a `/proprieta/nuova` dopo upgrade
+2. **Migliorati messaggi errore**: PropertyForm ora riconosce errore 403 e reindirizza a `/diventa-host`
+3. **Test end-to-end**: Verificato intero flusso guest → host → pubblica proprietà
+
+### Problema: Route Conflict `/proprieta/nuova`
+**Issue**: Navigando a `/proprieta/nuova`, l'app mostrava "Proprietà non trovata" (404)
+
+**Root Cause**:
+- Route dinamica `/proprieta/:id` veniva PRIMA della route statica `/proprieta/nuova` 
+- Wouter matchava `/proprieta/:id` interpretando "nuova" come ID
+- Server cercava proprietà con id="nuova" → 404
+
+**Fix Implementata**:
+- Riordinato le route in `App.tsx`: route statica `/proprieta/nuova` ora viene PRIMA di `/proprieta/:id`
+- Questo previene che "nuova" venga interpretato come parametro dinamico
+
+**Impact**: 
+- ✅ Flusso registrazione host completamente funzionante
+- ✅ Messaggi di errore chiari e informativi
+- ✅ UX migliorata con pagina onboarding dedicata
+- ✅ Zero errori 404 sulla creazione proprietà
+
 ## 🔐 Sistema di Sicurezza Implementato (Ottobre 2025)
 
 ### Middleware Role-Based
@@ -42,6 +79,7 @@ Accessibile solo ad admin su `/admin`:
 - **Profilo Utente**: Gestione prenotazioni e preferiti
 
 ### Per gli Host
+- **Flusso Onboarding**: Pagina dedicata `/diventa-host` che guida gli utenti da guest a host con upgrade esplicito del ruolo
 - **Registrazione Proprietà**: Form completo con test velocità WiFi integrato
 - **Dashboard**: Visualizzazione proprietà, prenotazioni e statistiche
 - **Calendario Sincronizzabile**: Supporto per sync con Airbnb, Booking.com e Google Calendar
