@@ -168,20 +168,20 @@ export default function Dashboard() {
             {properties.map((property) => (
               <div
                 key={property.id}
-                className="flex gap-4 p-4 border rounded-lg hover-elevate"
+                className="flex flex-col sm:flex-row gap-4 p-4 border rounded-lg hover-elevate"
                 data-testid={`property-item-${property.id}`}
               >
                 <img
                   src={property.images[0]}
                   alt={property.title}
-                  className="w-32 h-24 object-cover rounded-md"
+                  className="w-full sm:w-32 h-48 sm:h-24 object-cover rounded-md"
                 />
                 <div className="flex-1">
                   <h3 className="font-semibold mb-1">{property.title}</h3>
                   <p className="text-sm text-muted-foreground mb-2">
                     {property.city}, {property.country}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline">€{property.pricePerNight}/notte</Badge>
                     {property.isActive ? (
                       <Badge variant="default" className="bg-chart-2">Attiva</Badge>
@@ -190,11 +190,11 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Button variant="outline" size="sm" asChild>
+                <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
+                  <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
                     <Link href={`/proprieta/${property.id}/modifica`}>Modifica</Link>
                   </Button>
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" asChild className="flex-1 sm:flex-initial">
                     <Link href={`/proprieta/${property.id}`}>Visualizza</Link>
                   </Button>
                 </div>
