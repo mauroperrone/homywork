@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPropertySchema, type InsertProperty } from "@shared/schema";
+import { insertPropertySchema, type InsertProperty, type Property } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,14 +22,15 @@ import {
 } from "@/components/ui/select";
 import { WiFiSpeedTest } from "@/components/WiFiSpeedTest";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
 import type { UploadResult } from "@uppy/core";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const AMENITIES_OPTIONS = [
   "WiFi", "Parcheggio", "Cucina", "Lavatrice", "Aria condizionata",
@@ -48,9 +49,19 @@ export default function PropertyForm() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const params = useParams();
+  const propertyId = params.id;
+  const isEditing = !!propertyId;
+
   const [wifiSpeed, setWifiSpeed] = useState<number>();
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+
+  // Carica i dati della proprietà se stiamo modificando
+  const { data: existingProperty, isLoading: isLoadingProperty } = useQuery<Property>({
+    queryKey: ["/api/properties", propertyId],
+    enabled: isEditing,
+  });
 
   const form = useForm<InsertProperty>({
     resolver: zodResolver(insertPropertySchema),
@@ -68,14 +79,45 @@ export default function PropertyForm() {
       bathrooms: 1,
       images: [],
       amenities: [],
-      hostId: "", // Will be set from user context
+      hostId: "",
     },
   });
 
+  // Popola il form con i dati esistenti quando vengono caricati
+  useEffect(() => {
+    if (existingProperty) {
+      form.reset({
+        title: existingProperty.title,
+        description: existingProperty.description || "",
+        propertyType: existingProperty.propertyType,
+        address: existingProperty.address,
+        city: existingProperty.city,
+        country: existingProperty.country,
+        pricePerNight: existingProperty.pricePerNight,
+        maxGuests: existingProperty.maxGuests,
+        bedrooms: existingProperty.bedrooms,
+        beds: existingProperty.beds,
+        bathrooms: existingProperty.bathrooms,
+        images: existingProperty.images,
+        amenities: existingProperty.amenities,
+        hostId: existingProperty.hostId,
+      });
+      setSelectedAmenities(existingProperty.amenities);
+      setImageUrls(existingProperty.images);
+      if (existingProperty.wifiSpeed !== null) {
+        setWifiSpeed(existingProperty.wifiSpeed);
+      }
+    }
+  }, [existingProperty, form]);
+
   const createPropertyMutation = useMutation({
-    mutationFn: (data: InsertProperty) => apiRequest("POST", "/api/properties", data),
+    mutationFn: async (data: InsertProperty) => {
+      const response = await apiRequest("POST", "/api/properties", data);
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/host/properties"] });
       toast({
         title: "Proprietà creata!",
         description: "La tua proprietà è stata pubblicata con successo.",
@@ -100,6 +142,30 @@ export default function PropertyForm() {
           variant: "destructive",
         });
       }
+    },
+  });
+
+  const updatePropertyMutation = useMutation({
+    mutationFn: async (data: InsertProperty) => {
+      const response = await apiRequest("PATCH", `/api/properties/${propertyId}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties", propertyId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/host/properties"] });
+      toast({
+        title: "Proprietà aggiornata!",
+        description: "Le modifiche sono state salvate con successo.",
+      });
+      navigate("/dashboard");
+    },
+    onError: () => {
+      toast({
+        title: "Errore",
+        description: "Si è verificato un errore durante l'aggiornamento della proprietà.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -176,17 +242,46 @@ export default function PropertyForm() {
       amenities: selectedAmenities,
       wifiSpeed,
     };
-    createPropertyMutation.mutate(propertyData);
+    
+    if (isEditing) {
+      updatePropertyMutation.mutate(propertyData);
+    } else {
+      createPropertyMutation.mutate(propertyData);
+    }
   };
+
+  // Mostra skeleton mentre carica i dati in modalità edit
+  if (isEditing && isLoadingProperty) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="mb-8">
+          <Skeleton className="h-10 w-64 mb-2" />
+          <Skeleton className="h-5 w-96" />
+        </div>
+        <Card className="p-6 space-y-6">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-serif mb-2" data-testid="text-form-title">
-          Registra la tua Proprietà
+          {isEditing ? "Modifica Proprietà" : "Registra la tua Proprietà"}
         </h1>
         <p className="text-muted-foreground">
-          Inserisci i dettagli del tuo alloggio per smartworker e inizia ad accogliere nomadi digitali
+          {isEditing 
+            ? "Aggiorna i dettagli della tua proprietà"
+            : "Inserisci i dettagli del tuo alloggio per smartworker e inizia ad accogliere nomadi digitali"
+          }
         </p>
       </div>
 
@@ -478,10 +573,13 @@ export default function PropertyForm() {
             </Button>
             <Button
               type="submit"
-              disabled={createPropertyMutation.isPending}
+              disabled={createPropertyMutation.isPending || updatePropertyMutation.isPending}
               data-testid="button-submit-property"
             >
-              {createPropertyMutation.isPending ? "Creazione..." : "Pubblica Proprietà"}
+              {isEditing 
+                ? (updatePropertyMutation.isPending ? "Salvataggio..." : "Salva Modifiche")
+                : (createPropertyMutation.isPending ? "Creazione..." : "Pubblica Proprietà")
+              }
             </Button>
           </div>
         </form>

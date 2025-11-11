@@ -30,6 +30,11 @@ function Router() {
           <PropertyForm />
         </ProtectedRoute>
       </Route>
+      <Route path="/proprieta/:id/modifica">
+        <ProtectedRoute requiredRole="host">
+          <PropertyForm />
+        </ProtectedRoute>
+      </Route>
       <Route path="/proprieta/:id" component={PropertyDetail} />
       <Route path="/dashboard">
         <ProtectedRoute requiredRole="host">
