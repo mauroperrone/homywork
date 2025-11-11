@@ -1,11 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
 import { setupAuth, isAuthenticated, isHost, isGuest, isAdmin } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import Stripe from "stripe";
+import { eq, and, sql } from "drizzle-orm";
 import { 
+  bookings,
   insertPropertySchema, 
   insertBookingSchema, 
   insertCalendarSyncSchema,
@@ -251,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment intent for booking
+  // Stripe payment intent for booking - Platform holds funds, payout scheduled after check-in
   app.post('/api/create-payment-intent', isAuthenticated, async (req: any, res) => {
     try {
       const { amount, propertyId } = req.body;
@@ -260,39 +263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!property) {
         return res.status(404).json({ message: "Property not found" });
       }
-
-      const host = await storage.getUser(property.hostId);
-      if (!host) {
-        return res.status(404).json({ message: "Host not found" });
-      }
-
-      if (!host.stripeAccountId || !host.stripeOnboardingComplete) {
-        return res.status(400).json({ 
-          message: "Host has not completed Stripe onboarding. Cannot process payment." 
-        });
-      }
-
-      const stripeAccount = await stripe.accounts.retrieve(host.stripeAccountId);
-      if (!stripeAccount.charges_enabled) {
-        return res.status(400).json({ 
-          message: "Host Stripe account is not enabled for charges. Cannot process payment." 
-        });
-      }
-
-      const platformFeePercentage = 0.10;
-      const platformFee = Math.round(amount * platformFeePercentage * 100);
       
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "eur",
-        application_fee_amount: platformFee,
-        transfer_data: {
-          destination: host.stripeAccountId,
-        },
         metadata: {
           propertyId,
           userId: req.user.claims.sub,
-          hostId: host.id,
+          hostId: property.hostId,
         },
       });
 
@@ -459,12 +437,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { paymentIntentId } = req.body;
-      const booking = await storage.updateBookingStatus(
-        req.params.id,
-        'confirmed',
-        paymentIntentId
-      );
-      res.json(booking);
+      
+      const totalPriceInCents = Math.round(existingBooking.totalPrice * 100);
+      const platformFeePercentage = 0.10;
+      const platformFee = Math.round(totalPriceInCents * platformFeePercentage);
+      const payoutAmount = totalPriceInCents - platformFee;
+      
+      const update = await db.update(bookings)
+        .set({
+          status: 'confirmed',
+          stripePaymentIntentId: paymentIntentId,
+          payoutStatus: 'pending',
+          payoutAmount,
+          platformFee,
+        })
+        .where(
+          and(
+            eq(bookings.id, req.params.id),
+            eq(bookings.status, existingBooking.status),
+            eq(bookings.payoutStatus, existingBooking.payoutStatus),
+            existingBooking.stripePaymentIntentId
+              ? eq(bookings.stripePaymentIntentId, existingBooking.stripePaymentIntentId)
+              : sql`${bookings.stripePaymentIntentId} IS NULL`
+          )
+        )
+        .returning();
+      
+      if (!update[0]) {
+        console.log("Booking state changed concurrently, aborting confirmation");
+        return res.status(409).json({ message: "Booking state changed, please retry" });
+      }
+      
+      res.json(update[0]);
     } catch (error) {
       console.error("Error confirming booking:", error);
       res.status(500).json({ message: "Failed to confirm booking" });

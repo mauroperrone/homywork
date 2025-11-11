@@ -41,7 +41,16 @@ export interface IStorage {
   getGuestBookings(guestId: string): Promise<Booking[]>;
   getHostBookings(hostId: string): Promise<Booking[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
-  updateBookingStatus(id: string, status: string, paymentIntentId?: string): Promise<Booking | undefined>;
+  updateBookingStatus(id: string, status: string, paymentIntentId?: string | null): Promise<Booking | undefined>;
+  getBookingsForPayout(): Promise<Booking[]>;
+  updateBookingPayout(id: string, payoutData: {
+    payoutStatus: string;
+    payoutAmount?: number;
+    platformFee?: number;
+    payoutDate?: Date;
+    stripeTransferId?: string;
+  }): Promise<Booking | undefined>;
+  resetBookingPayout(id: string): Promise<Booking | undefined>;
   
   // Availability
   checkAvailability(propertyId: string, checkIn: Date, checkOut: Date): Promise<boolean>;
@@ -240,14 +249,70 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateBookingStatus(id: string, status: string, paymentIntentId?: string): Promise<Booking | undefined> {
+  async updateBookingStatus(id: string, status: string, paymentIntentId?: string | null): Promise<Booking | undefined> {
     const updates: any = { status };
-    if (paymentIntentId) {
+    if (paymentIntentId !== undefined) {
       updates.stripePaymentIntentId = paymentIntentId;
     }
     
     const result = await db.update(bookings)
       .set(updates)
+      .where(eq(bookings.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBookingsForPayout(): Promise<Booking[]> {
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    const result = await db
+      .select({ booking: bookings })
+      .from(bookings)
+      .leftJoin(properties, eq(bookings.propertyId, properties.id))
+      .leftJoin(users, eq(properties.hostId, users.id))
+      .where(
+        and(
+          eq(bookings.payoutStatus, "pending"),
+          eq(bookings.status, "confirmed"),
+          lte(bookings.checkIn, oneDayAgo),
+          sql`${users.stripeAccountId} IS NOT NULL`,
+          eq(users.stripeOnboardingComplete, true)
+        )
+      )
+      .orderBy(bookings.checkIn);
+
+    return result.map(r => r.booking);
+  }
+
+  async updateBookingPayout(id: string, payoutData: {
+    payoutStatus: string;
+    payoutAmount?: number;
+    platformFee?: number;
+    payoutDate?: Date;
+    stripeTransferId?: string;
+  }): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set(payoutData)
+      .where(
+        and(
+          eq(bookings.id, id),
+          eq(bookings.payoutStatus, "pending")
+        )
+      )
+      .returning();
+    return result[0];
+  }
+
+  async resetBookingPayout(id: string): Promise<Booking | undefined> {
+    const result = await db.update(bookings)
+      .set({
+        payoutStatus: 'pending',
+        payoutAmount: null,
+        platformFee: null,
+        payoutDate: null,
+        stripeTransferId: null,
+      })
       .where(eq(bookings.id, id))
       .returning();
     return result[0];

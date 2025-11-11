@@ -64,8 +64,15 @@ export const bookings = pgTable("bookings", {
   totalPrice: integer("total_price").notNull(),
   status: text("status").notNull().default("pending"), // 'pending', 'confirmed', 'cancelled', 'completed'
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  payoutStatus: text("payout_status").notNull().default("pending"), // 'pending', 'scheduled', 'completed', 'failed'
+  payoutAmount: integer("payout_amount"), // Amount to transfer to host (in cents)
+  platformFee: integer("platform_fee"), // Platform commission (in cents)
+  payoutDate: timestamp("payout_date"), // When transfer was executed
+  stripeTransferId: text("stripe_transfer_id"), // Stripe Transfer ID for audit
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("IDX_booking_payout").on(table.payoutStatus, table.checkIn),
+]);
 
 // Tabella disponibilità/blocchi calendario
 export const availability = pgTable("availability", {
@@ -130,6 +137,11 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   id: true,
   createdAt: true,
   stripePaymentIntentId: true,
+  payoutStatus: true,
+  payoutAmount: true,
+  platformFee: true,
+  payoutDate: true,
+  stripeTransferId: true,
 }).extend({
   checkIn: z.date(),
   checkOut: z.date(),
