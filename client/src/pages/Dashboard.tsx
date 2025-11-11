@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import { Plus, Home, Calendar, Euro, TrendingUp } from "lucide-react";
 import type { Property, Booking } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StripeConnectOnboarding } from "@/components/StripeConnectOnboarding";
 
 export default function Dashboard() {
   const { data: properties, isLoading: propertiesLoading } = useQuery<Property[]>({
@@ -109,6 +110,11 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* Stripe Connect Onboarding */}
+      <div className="mb-8">
+        <StripeConnectOnboarding />
       </div>
 
       {/* Properties List */}
