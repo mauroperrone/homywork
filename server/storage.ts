@@ -42,7 +42,7 @@ export interface IStorage {
   getHostBookings(hostId: string): Promise<Booking[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: string, status: string, paymentIntentId?: string | null): Promise<Booking | undefined>;
-  getBookingsForPayout(): Promise<Booking[]>;
+  getBookingsForPayout(): Promise<Array<Booking & { property?: Property & { host?: User } }>>;
   updateBookingPayout(id: string, payoutData: {
     payoutStatus: string;
     payoutAmount?: number;
@@ -262,12 +262,16 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getBookingsForPayout(): Promise<Booking[]> {
+  async getBookingsForPayout(): Promise<Array<Booking & { property?: Property & { host?: User } }>> {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
     
     const result = await db
-      .select({ booking: bookings })
+      .select({
+        booking: bookings,
+        property: properties,
+        host: users,
+      })
       .from(bookings)
       .leftJoin(properties, eq(bookings.propertyId, properties.id))
       .leftJoin(users, eq(properties.hostId, users.id))
@@ -282,7 +286,13 @@ export class DbStorage implements IStorage {
       )
       .orderBy(bookings.checkIn);
 
-    return result.map(r => r.booking);
+    return result.map(r => ({
+      ...r.booking,
+      property: r.property ? {
+        ...r.property,
+        host: r.host || undefined,
+      } : undefined,
+    }));
   }
 
   async updateBookingPayout(id: string, payoutData: {
