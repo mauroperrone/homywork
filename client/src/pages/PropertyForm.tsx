@@ -23,7 +23,7 @@ import {
 import { WiFiSpeedTest } from "@/components/WiFiSpeedTest";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useState, useEffect } from "react";
-import { Plus, X, Upload } from "lucide-react";
+import { Plus, X, Upload, ChevronUp, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -179,6 +179,22 @@ export default function PropertyForm() {
 
   const removeImage = (url: string) => {
     setImageUrls(imageUrls.filter(img => img !== url));
+  };
+
+  const moveImageUp = (index: number) => {
+    if (index > 0) {
+      const newUrls = [...imageUrls];
+      [newUrls[index], newUrls[index - 1]] = [newUrls[index - 1], newUrls[index]];
+      setImageUrls(newUrls);
+    }
+  };
+
+  const moveImageDown = (index: number) => {
+    if (index < imageUrls.length - 1) {
+      const newUrls = [...imageUrls];
+      [newUrls[index], newUrls[index + 1]] = [newUrls[index + 1], newUrls[index]];
+      setImageUrls(newUrls);
+    }
   };
 
   const handleGetUploadParameters = async (file: any) => {
@@ -562,18 +578,59 @@ export default function PropertyForm() {
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {imageUrls.map((url, idx) => (
-                <div key={idx} className="relative aspect-video rounded-lg overflow-hidden group">
+                <div key={idx} className="relative aspect-video rounded-lg overflow-hidden bg-muted">
                   <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => removeImage(url)}
-                    data-testid={`button-remove-image-${idx}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                  
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+                  
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="h-7 w-7 shadow-lg"
+                      onClick={() => removeImage(url)}
+                      aria-label="Rimuovi immagine"
+                      data-testid={`button-remove-image-${idx}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  
+                  <div className="absolute bottom-2 left-2 flex gap-1">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 shadow-lg"
+                      onClick={() => moveImageUp(idx)}
+                      disabled={idx === 0}
+                      aria-label="Sposta immagine su"
+                      data-testid={`button-move-up-${idx}`}
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 shadow-lg"
+                      onClick={() => moveImageDown(idx)}
+                      disabled={idx === imageUrls.length - 1}
+                      aria-label="Sposta immagine giù"
+                      data-testid={`button-move-down-${idx}`}
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  
+                  {idx === 0 && (
+                    <div className="absolute top-2 left-2">
+                      <Badge variant="default" className="text-xs shadow-lg">
+                        Foto Principale
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
