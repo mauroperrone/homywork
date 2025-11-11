@@ -256,12 +256,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { amount, propertyId } = req.body;
       
+      const property = await storage.getProperty(propertyId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      const host = await storage.getUser(property.hostId);
+      if (!host) {
+        return res.status(404).json({ message: "Host not found" });
+      }
+
+      if (!host.stripeAccountId || !host.stripeOnboardingComplete) {
+        return res.status(400).json({ 
+          message: "Host has not completed Stripe onboarding. Cannot process payment." 
+        });
+      }
+
+      const stripeAccount = await stripe.accounts.retrieve(host.stripeAccountId);
+      if (!stripeAccount.charges_enabled) {
+        return res.status(400).json({ 
+          message: "Host Stripe account is not enabled for charges. Cannot process payment." 
+        });
+      }
+
+      const platformFeePercentage = 0.10;
+      const platformFee = Math.round(amount * platformFeePercentage * 100);
+      
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "eur",
+        application_fee_amount: platformFee,
+        transfer_data: {
+          destination: host.stripeAccountId,
+        },
         metadata: {
           propertyId,
           userId: req.user.claims.sub,
+          hostId: host.id,
         },
       });
 
