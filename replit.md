@@ -30,6 +30,95 @@ HomyWork is built as a single-page application (SPA) with a clear separation bet
 
 ## Recent Feature Implementations
 
+### Stripe Connect Express for Host Payments (November 2025)
+**Status**: ✅ Completed and Tested
+
+**Feature Overview:**
+Host payment system using Stripe Connect Express accounts, enabling hosts (private individuals) to receive payments from guest bookings with automatic platform fee collection (10%).
+
+**Implementation:**
+
+1. **Database Schema** (`shared/schema.ts`):
+   - `stripeAccountId: varchar("stripe_account_id")` - Stores Stripe Express account ID
+   - `stripeOnboardingComplete: boolean("stripe_onboarding_complete").default(false)` - Tracks onboarding status
+
+2. **Backend Routes** (`server/routes.ts`):
+   - POST `/api/host/stripe/create-account`: Creates Stripe Express account (country='IT', type='express', business_type='individual')
+   - POST `/api/host/stripe/onboarding-link`: Generates account_link for Stripe onboarding flow
+   - GET `/api/host/stripe/status`: Retrieves account status, checks charges_enabled, updates DB
+   - POST `/api/host/stripe/dashboard-link`: Generates login_link for Express Dashboard
+
+3. **Payment Flow** (`server/routes.ts` - `/api/create-payment-intent`):
+   - **Destination Charge Pattern**: Payment created on platform account, funds automatically transferred to host
+   - Validates host completed onboarding (stripeOnboardingComplete === true)
+   - Real-time check on charges_enabled before payment
+   - Platform fee: 10% (€10 on €100 booking)
+   - Host receives: 90% (€90 on €100 booking)
+   - Uses `transfer_data.destination` for automatic fund routing
+
+4. **Frontend Component** (`client/src/components/StripeConnectOnboarding.tsx`):
+   - **Three UI States**:
+     a. No Account: "Collega Account Stripe" button → creates account → redirect to onboarding
+     b. Onboarding Incomplete: "Completa Configurazione" button → redirect to complete setup
+     c. Active: "Attivo" badge + "Apri Dashboard Stripe" button
+   - Real-time status polling with query refetch
+   - Loading states and toast notifications for all operations
+
+5. **Dashboard Integration** (`client/src/pages/Dashboard.tsx`):
+   - StripeConnectOnboarding component displayed between stats and property list
+   - Visible to all hosts on dashboard page
+   - Auto-detects onboarding status on page load
+
+**Technical Details:**
+
+**Stripe Account Type:**
+- Express Account: Managed by Stripe, handles KYC/compliance automatically
+- Business Type: Individual (for private hosts, not companies)
+- Country: Italy (IT)
+- Capabilities: card_payments, transfers
+
+**Payment Flow:**
+```
+Guest pays €100
+  ↓
+Platform account receives €100
+  ↓ (automatic transfer via transfer_data.destination)
+Host receives €90 (in Express account)
+  ↓
+Platform keeps €10 (application_fee_amount)
+```
+
+**Security & Validation:**
+- Middleware: `isHost` required for all Stripe Connect routes
+- Onboarding verification: Cached (DB) + Real-time (Stripe API)
+- Payment blocking: If host not onboarded or charges_disabled
+- Metadata tracking: propertyId, userId, hostId for audit trail
+
+**User Experience:**
+- One-click account creation from dashboard
+- Stripe-hosted onboarding flow (compliance handled by Stripe)
+- Express Dashboard access for hosts to view earnings, payouts
+- Clear error messages if payment blocked (onboarding incomplete)
+
+**Testing:**
+- Stripe test mode compatible
+- Test Express accounts can be created without real KYC
+- Payment Intent simulation with test cards
+- Destination charges verified in Stripe Dashboard
+
+**Behavior:**
+- ✅ Host creates Stripe account from dashboard (one click)
+- ✅ Host completes onboarding via Stripe-hosted flow
+- ✅ Guest books property → payment routes to host (90%) + platform (10%)
+- ✅ Host views earnings in Express Dashboard
+- ✅ Payment blocked if host hasn't completed onboarding
+
+**Technical Notes:**
+- Destination Charge vs Direct Charge: Uses destination charge to maintain frontend compatibility with platform publishable key
+- Real-time validation: Fetches Stripe account before each payment to ensure charges_enabled
+- Platform fee: Hardcoded 10% (can be parameterized via env variable)
+- Refunds: Handled via Stripe API on destination charges
+
 ### WiFi Speed Persistence (November 2025)
 **Status**: ✅ Completed and Tested
 
