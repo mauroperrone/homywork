@@ -132,6 +132,7 @@ export default function Checkout() {
 
   const [clientSecret, setClientSecret] = useState("");
 
+  // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       toast({
@@ -142,20 +143,32 @@ export default function Checkout() {
       setTimeout(() => {
         window.location.href = "/api/login";
       }, 1000);
+    }
+  }, [isAuthenticated, authLoading]);
+
+  // Create payment intent only when property is loaded
+  useEffect(() => {
+    // Wait for auth to be ready
+    if (authLoading || !isAuthenticated) {
       return;
     }
 
+    // Wait for valid params
     if (!propertyId || !checkIn || !checkOut || totalPrice <= 0) {
-      toast({
-        title: "Dati Mancanti",
-        description: "Informazioni di prenotazione non valide.",
-        variant: "destructive",
-      });
-      navigate("/");
       return;
     }
 
-    // Create payment intent
+    // Wait for property to be loaded
+    if (!property) {
+      return;
+    }
+
+    // Don't create if already have secret
+    if (clientSecret) {
+      return;
+    }
+
+    // Now create payment intent
     apiRequest("POST", "/api/create-payment-intent", {
       amount: totalPrice,
       propertyId,
@@ -171,12 +184,29 @@ export default function Checkout() {
         });
         navigate("/");
       });
-  }, [propertyId, checkIn, checkOut, totalPrice, isAuthenticated, authLoading]);
+  }, [propertyId, checkIn, checkOut, totalPrice, property, isAuthenticated, authLoading, clientSecret]);
 
   if (authLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  // Show error if params invalid
+  if (!propertyId || !checkIn || !checkOut || totalPrice <= 0) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card className="p-6 text-center">
+          <h2 className="text-xl font-semibold mb-2">Dati Mancanti</h2>
+          <p className="text-muted-foreground mb-4">
+            Informazioni di prenotazione non valide. Per favore torna alla pagina della proprietà e riprova.
+          </p>
+          <Button onClick={() => navigate("/")} data-testid="button-back-home">
+            Torna alla Home
+          </Button>
+        </Card>
       </div>
     );
   }
