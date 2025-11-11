@@ -539,7 +539,7 @@ export default function PropertyForm() {
           </Card>
 
           {/* WiFi Speed Test */}
-          <WiFiSpeedTest onSpeedMeasured={setWifiSpeed} currentSpeed={wifiSpeed} />
+          <WiFiSpeedTest value={wifiSpeed} onChange={setWifiSpeed} />
 
           {/* Amenities */}
           <Card className="p-6 space-y-4">

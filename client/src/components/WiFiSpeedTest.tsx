@@ -2,22 +2,34 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Wifi, Activity, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface WiFiSpeedTestProps {
-  onSpeedMeasured: (speed: number) => void;
-  currentSpeed?: number;
+  value?: number;
+  onChange: (speed: number | undefined) => void;
 }
 
-export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestProps) {
+export function WiFiSpeedTest({ value, onChange }: WiFiSpeedTestProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [speed, setSpeed] = useState<number | null>(currentSpeed || null);
+
+  const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    if (inputValue === '') {
+      onChange(undefined);
+    } else {
+      const numValue = parseInt(inputValue, 10);
+      if (!isNaN(numValue) && numValue >= 0) {
+        onChange(numValue);
+      }
+    }
+  };
 
   const runSpeedTest = async () => {
     setIsTesting(true);
     setProgress(0);
-    setSpeed(null);
 
     // Simulazione test velocità (in produzione usare un servizio reale come speedtest.net API o fast.com)
     const simulateTest = async () => {
@@ -29,8 +41,7 @@ export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestPr
 
       // Simula velocità misurata (in produzione, fare vero test di download)
       const measuredSpeed = Math.floor(Math.random() * 150) + 20; // 20-170 Mbps
-      setSpeed(measuredSpeed);
-      onSpeedMeasured(measuredSpeed);
+      onChange(measuredSpeed);
       setIsTesting(false);
     };
 
@@ -43,7 +54,7 @@ export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestPr
     return { label: "Sufficiente", color: "text-yellow-600", icon: AlertCircle };
   };
 
-  const speedQuality = speed ? getSpeedQuality(speed) : null;
+  const speedQuality = value ? getSpeedQuality(value) : null;
   const SpeedIcon = speedQuality?.icon;
 
   return (
@@ -53,19 +64,37 @@ export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestPr
           <Wifi className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold">Test Velocità WiFi</h3>
+          <h3 className="font-semibold">Velocità WiFi</h3>
           <p className="text-sm text-muted-foreground">
-            Misura la velocità della tua connessione internet
+            Inserisci la velocità manualmente o esegui un test automatico
           </p>
         </div>
       </div>
 
-      {speed && !isTesting && speedQuality && SpeedIcon && (
+      <div className="space-y-2">
+        <Label htmlFor="wifi-speed-input">Velocità WiFi (Mbps)</Label>
+        <Input
+          id="wifi-speed-input"
+          type="number"
+          min="0"
+          max="2000"
+          placeholder="Es. 100"
+          value={value ?? ''}
+          onChange={handleManualChange}
+          disabled={isTesting}
+          data-testid="input-wifi-speed"
+        />
+        <p className="text-xs text-muted-foreground">
+          Velocità minima raccomandata: 50 Mbps per smart working
+        </p>
+      </div>
+
+      {value && !isTesting && speedQuality && SpeedIcon && (
         <div className="bg-muted/50 rounded-lg p-4 text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
             <SpeedIcon className={`h-5 w-5 ${speedQuality.color}`} />
-            <span className="text-3xl font-bold" data-testid="text-speed-result">
-              {speed} Mbps
+            <span className="text-2xl font-bold" data-testid="text-speed-result">
+              {value} Mbps
             </span>
           </div>
           <p className={`text-sm font-medium ${speedQuality.color}`} data-testid="text-speed-quality">
@@ -77,7 +106,7 @@ export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestPr
       {isTesting && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span>Test in corso...</span>
+            <span>Test automatico in corso...</span>
             <span>{progress}%</span>
           </div>
           <Progress value={progress} className="h-2" data-testid="progress-wifi-test" />
@@ -87,14 +116,15 @@ export function WiFiSpeedTest({ onSpeedMeasured, currentSpeed }: WiFiSpeedTestPr
       <Button
         onClick={runSpeedTest}
         disabled={isTesting}
+        variant="outline"
         className="w-full"
         data-testid="button-run-wifi-test"
       >
-        {isTesting ? "Test in corso..." : speed ? "Ripeti Test" : "Avvia Test WiFi"}
+        {isTesting ? "Test in corso..." : value ? "Ripeti Test Automatico" : "Avvia Test Automatico"}
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">
-        {speed && speed >= 50 
+        {value && value >= 50 
           ? "✓ WiFi certificato - Velocità adatta per smart working e streaming"
           : "Velocità WiFi importante per l'esperienza degli ospiti"}
       </p>
