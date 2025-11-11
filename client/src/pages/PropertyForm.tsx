@@ -256,7 +256,7 @@ export default function PropertyForm() {
       ...data,
       images: imageUrls,
       amenities: selectedAmenities,
-      wifiSpeed,
+      ...(wifiSpeed !== undefined && { wifiSpeed }),
     };
     
     if (isEditing) {
