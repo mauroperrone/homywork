@@ -49,19 +49,29 @@ export async function processScheduledPayouts(): Promise<{
           continue;
         }
         
-        const transfer = await stripe.transfers.create({
-          amount: booking.payoutAmount!,
-          currency: 'eur',
-          destination: host.stripeAccountId,
-          description: `Payout for booking ${booking.id} - Property: ${booking.property?.title}`,
-          metadata: {
-            bookingId: booking.id.toString(),
-            propertyId: booking.propertyId.toString(),
-            hostId: host.id,
-          },
-        });
+        const isTestMode = process.env.TESTING_STRIPE_SECRET_KEY === process.env.STRIPE_SECRET_KEY;
+        let transfer;
         
-        console.log(`[Scheduler] Transfer created: ${transfer.id} - Amount: ${transfer.amount} cents`);
+        if (isTestMode) {
+          transfer = {
+            id: `tr_test_${booking.id.substring(0, 24)}`,
+            amount: booking.payoutAmount!,
+          };
+          console.log(`[Scheduler] Test mode - skipping Stripe transfer, using fake ID: ${transfer.id}`);
+        } else {
+          transfer = await stripe.transfers.create({
+            amount: booking.payoutAmount!,
+            currency: 'eur',
+            destination: host.stripeAccountId,
+            description: `Payout for booking ${booking.id} - Property: ${booking.property?.title}`,
+            metadata: {
+              bookingId: booking.id.toString(),
+              propertyId: booking.propertyId.toString(),
+              hostId: host.id,
+            },
+          });
+          console.log(`[Scheduler] Transfer created: ${transfer.id} - Amount: ${transfer.amount} cents`);
+        }
         
         await storage.updateBookingPayout(booking.id, {
           payoutStatus: 'completed',
