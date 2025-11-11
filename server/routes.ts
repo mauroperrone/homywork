@@ -272,6 +272,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stripe Connect routes for hosts
+  app.post('/api/host/stripe/create-account', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.stripeAccountId) {
+        return res.status(400).json({ message: "Stripe account already exists" });
+      }
+
+      const account = await stripe.accounts.create({
+        country: 'IT',
+        type: 'express',
+        business_type: 'individual',
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        email: user.email || undefined,
+        individual: {
+          email: user.email || undefined,
+          first_name: user.firstName || undefined,
+          last_name: user.lastName || undefined,
+        },
+      });
+
+      await storage.updateUserStripeAccount(userId, account.id, false);
+
+      res.json({ accountId: account.id });
+    } catch (error: any) {
+      console.error("Error creating Stripe account:", error);
+      res.status(500).json({ message: "Error creating Stripe account: " + error.message });
+    }
+  });
+
+  app.post('/api/host/stripe/onboarding-link', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeAccountId) {
+        return res.status(400).json({ message: "No Stripe account found. Create one first." });
+      }
+
+      const accountLink = await stripe.accountLinks.create({
+        account: user.stripeAccountId,
+        refresh_url: `${req.headers.origin}/dashboard?stripe_refresh=true`,
+        return_url: `${req.headers.origin}/dashboard?stripe_return=true`,
+        type: 'account_onboarding',
+      });
+
+      res.json({ url: accountLink.url });
+    } catch (error: any) {
+      console.error("Error creating onboarding link:", error);
+      res.status(500).json({ message: "Error creating onboarding link: " + error.message });
+    }
+  });
+
+  app.get('/api/host/stripe/status', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeAccountId) {
+        return res.json({ 
+          hasAccount: false,
+          onboardingComplete: false,
+          chargesEnabled: false 
+        });
+      }
+
+      const account = await stripe.accounts.retrieve(user.stripeAccountId);
+
+      const onboardingComplete = account.details_submitted && account.charges_enabled;
+
+      if (onboardingComplete !== user.stripeOnboardingComplete) {
+        await storage.updateUserStripeAccount(user.stripeAccountId, user.stripeAccountId, onboardingComplete);
+      }
+
+      res.json({
+        hasAccount: true,
+        onboardingComplete,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+      });
+    } catch (error: any) {
+      console.error("Error checking Stripe status:", error);
+      res.status(500).json({ message: "Error checking Stripe status: " + error.message });
+    }
+  });
+
+  app.post('/api/host/stripe/dashboard-link', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeAccountId) {
+        return res.status(400).json({ message: "No Stripe account found" });
+      }
+
+      const loginLink = await stripe.accounts.createLoginLink(user.stripeAccountId);
+
+      res.json({ url: loginLink.url });
+    } catch (error: any) {
+      console.error("Error creating dashboard link:", error);
+      res.status(500).json({ message: "Error creating dashboard link: " + error.message });
+    }
+  });
+
   // Create booking with payment
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {
