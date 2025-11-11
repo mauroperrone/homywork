@@ -58,7 +58,7 @@ export default function PropertyForm() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   // Carica i dati della proprietà se stiamo modificando
-  const { data: existingProperty, isLoading: isLoadingProperty } = useQuery<Property>({
+  const { data: existingProperty, isLoading: isLoadingProperty, isError: isPropertyError } = useQuery<Property>({
     queryKey: ["/api/properties", propertyId],
     enabled: isEditing,
   });
@@ -265,6 +265,25 @@ export default function PropertyForm() {
           <div className="grid grid-cols-2 gap-4">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Mostra errore se la proprietà non viene trovata
+  if (isEditing && isPropertyError) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Card className="p-6">
+          <div className="text-center py-8">
+            <h2 className="text-2xl font-bold mb-4">Proprietà Non Trovata</h2>
+            <p className="text-muted-foreground mb-6">
+              La proprietà che stai cercando di modificare non esiste o non hai i permessi per accedervi.
+            </p>
+            <Button onClick={() => navigate("/dashboard")}>
+              Torna alla Dashboard
+            </Button>
           </div>
         </Card>
       </div>
