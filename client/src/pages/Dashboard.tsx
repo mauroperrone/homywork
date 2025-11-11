@@ -27,7 +27,7 @@ export default function Dashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed": return "bg-chart-2";
-      case "pending": return "bg-yellow-500";
+      case "pending": return "bg-chart-4";
       case "cancelled": return "bg-destructive";
       case "completed": return "bg-chart-3";
       default: return "bg-muted";
@@ -41,6 +41,36 @@ export default function Dashboard() {
       case "cancelled": return "Cancellata";
       case "completed": return "Completata";
       default: return status;
+    }
+  };
+
+  const normalizePayoutStatus = (payoutStatus: string | null | undefined): string => {
+    if (!payoutStatus || payoutStatus === "") {
+      return "pending";
+    }
+    const validStatuses = ["completed", "pending", "failed"];
+    if (!validStatuses.includes(payoutStatus)) {
+      console.warn(`Unexpected payout status: ${payoutStatus}, defaulting to pending`);
+      return "pending";
+    }
+    return payoutStatus;
+  };
+
+  const getPayoutStatusColor = (payoutStatus: string): string => {
+    switch (payoutStatus) {
+      case "completed": return "bg-chart-2";
+      case "pending": return "bg-chart-4";
+      case "failed": return "bg-destructive";
+      default: return "bg-chart-4";
+    }
+  };
+
+  const getPayoutStatusLabel = (payoutStatus: string): string => {
+    switch (payoutStatus) {
+      case "completed": return "Pagato";
+      case "pending": return "In Attesa Payout";
+      case "failed": return "Payout Fallito";
+      default: return "In Attesa Payout";
     }
   };
 
@@ -209,8 +239,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="font-semibold">€{booking.totalPrice}</p>
-                  <Badge className={getStatusColor(booking.status)}>
+                  <Badge className={getStatusColor(booking.status)} data-testid={`badge-status-${booking.id}`}>
                     {getStatusLabel(booking.status)}
+                  </Badge>
+                  <Badge className={getPayoutStatusColor(normalizePayoutStatus(booking.payoutStatus))} data-testid={`badge-payout-${booking.id}`}>
+                    {getPayoutStatusLabel(normalizePayoutStatus(booking.payoutStatus))}
                   </Badge>
                 </div>
               </div>
