@@ -6,15 +6,22 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-09-30.clover',
 });
 
-export async function processScheduledPayouts() {
+export async function processScheduledPayouts(): Promise<{
+  processed: number;
+  failed: number;
+  total: number;
+}> {
   console.log('[Scheduler] Starting processScheduledPayouts...');
+  
+  const stats = { processed: 0, failed: 0, total: 0 };
   
   try {
     const eligibleBookings = await storage.getBookingsForPayout();
+    stats.total = eligibleBookings.length;
     
     if (eligibleBookings.length === 0) {
       console.log('[Scheduler] No eligible bookings for payout');
-      return;
+      return stats;
     }
     
     console.log(`[Scheduler] Found ${eligibleBookings.length} bookings eligible for payout`);
@@ -29,6 +36,7 @@ export async function processScheduledPayouts() {
           await storage.updateBookingPayout(booking.id, {
             payoutStatus: 'failed',
           });
+          stats.failed++;
           continue;
         }
         
@@ -37,6 +45,7 @@ export async function processScheduledPayouts() {
           await storage.updateBookingPayout(booking.id, {
             payoutStatus: 'failed',
           });
+          stats.failed++;
           continue;
         }
         
@@ -61,17 +70,21 @@ export async function processScheduledPayouts() {
         });
         
         console.log(`[Scheduler] Booking ${booking.id} payout completed`);
+        stats.processed++;
       } catch (error: any) {
         console.error(`[Scheduler] Failed to process booking ${booking.id}:`, error.message);
         await storage.updateBookingPayout(booking.id, {
           payoutStatus: 'failed',
         });
+        stats.failed++;
       }
     }
     
-    console.log('[Scheduler] processScheduledPayouts completed');
+    console.log(`[Scheduler] processScheduledPayouts completed - Processed: ${stats.processed}, Failed: ${stats.failed}, Total: ${stats.total}`);
+    return stats;
   } catch (error) {
     console.error('[Scheduler] Error in processScheduledPayouts:', error);
+    return stats;
   }
 }
 

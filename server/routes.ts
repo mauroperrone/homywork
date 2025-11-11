@@ -7,6 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import Stripe from "stripe";
 import { eq, and, sql } from "drizzle-orm";
+import { processScheduledPayouts } from "./scheduler";
 import { 
   bookings,
   insertPropertySchema, 
@@ -642,6 +643,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user role:", error);
       res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.post('/api/admin/trigger-payouts', isAdmin, async (req, res) => {
+    try {
+      console.log('[Admin] Manual payout trigger requested');
+      const stats = await processScheduledPayouts();
+      res.json({ 
+        message: "Payout processing completed",
+        status: "success",
+        stats: {
+          processed: stats.processed,
+          failed: stats.failed,
+          total: stats.total,
+        }
+      });
+    } catch (error) {
+      console.error("Error triggering payouts:", error);
+      res.status(500).json({ message: "Failed to trigger payouts" });
     }
   });
 
