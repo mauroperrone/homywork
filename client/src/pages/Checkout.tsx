@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
-import type { Property } from "@shared/schema";
+import type { Property, Booking } from "@shared/schema";
 import { Calendar, MapPin, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -62,13 +62,13 @@ function CheckoutForm({ propertyId, checkIn, checkOut, guests, totalPrice, clien
         });
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         // Create booking with payment confirmation
-        const booking = await apiRequest("POST", "/api/bookings", {
+        const booking = (await apiRequest("POST", "/api/bookings", {
           propertyId,
           checkIn: new Date(checkIn),
           checkOut: new Date(checkOut),
           guests,
           totalPrice,
-        });
+        })) as unknown as Booking;
 
         // Confirm booking with payment intent ID
         await apiRequest("POST", `/api/bookings/${booking.id}/confirm`, {
@@ -133,7 +133,10 @@ export default function Checkout() {
   const [clientSecret, setClientSecret] = useState("");
 
   useEffect(() => {
+    console.log("[Checkout] useEffect triggered", { propertyId, checkIn, checkOut, totalPrice, isAuthenticated, authLoading });
+    
     if (!authLoading && !isAuthenticated) {
+      console.log("[Checkout] Not authenticated, redirecting to login");
       toast({
         title: "Autenticazione Richiesta",
         description: "Devi effettuare il login per completare la prenotazione.",
@@ -146,6 +149,7 @@ export default function Checkout() {
     }
 
     if (!propertyId || !checkIn || !checkOut || totalPrice <= 0) {
+      console.log("[Checkout] Missing params, redirecting to home", { propertyId, checkIn, checkOut, totalPrice });
       toast({
         title: "Dati Mancanti",
         description: "Informazioni di prenotazione non valide.",
@@ -155,15 +159,18 @@ export default function Checkout() {
       return;
     }
 
+    console.log("[Checkout] Creating payment intent...");
     // Create payment intent
     apiRequest("POST", "/api/create-payment-intent", {
       amount: totalPrice,
       propertyId,
     })
       .then((data: any) => {
+        console.log("[Checkout] Payment intent created, clientSecret:", data.clientSecret?.substring(0, 20) + "...");
         setClientSecret(data.clientSecret);
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("[Checkout] Failed to create payment intent:", error);
         toast({
           title: "Errore",
           description: "Impossibile inizializzare il pagamento.",
@@ -184,7 +191,7 @@ export default function Checkout() {
   if (!clientSecret || !property) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full" data-testid="skeleton-checkout-loading" />
       </div>
     );
   }
