@@ -23,7 +23,7 @@ import {
 import { WiFiSpeedTest } from "@/components/WiFiSpeedTest";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useState, useEffect } from "react";
-import { Plus, X, Upload, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, X, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,6 +31,23 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, useParams } from "wouter";
 import type { UploadResult } from "@uppy/core";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const AMENITIES_OPTIONS = [
   "WiFi", "Parcheggio", "Cucina", "Lavatrice", "Aria condizionata",
@@ -44,6 +61,76 @@ const PROPERTY_TYPES = [
   { value: "villa", label: "Villa" },
   { value: "room", label: "Stanza" },
 ];
+
+interface DraggableImageProps {
+  url: string;
+  index: number;
+  onRemove: (url: string) => void;
+}
+
+function DraggableImage({ url, index, onRemove }: DraggableImageProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: url });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative aspect-video rounded-lg overflow-hidden bg-muted group"
+      data-testid={`draggable-image-${index}`}
+    >
+      <img src={url} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+      
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+      
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-2 left-2 p-1.5 bg-background/90 rounded-md cursor-grab active:cursor-grabbing shadow-lg hover-elevate"
+        data-testid={`drag-handle-${index}`}
+      >
+        <GripVertical className="h-4 w-4" />
+      </div>
+
+      {/* Remove Button */}
+      <div className="absolute top-2 right-2">
+        <Button
+          type="button"
+          variant="destructive"
+          size="icon"
+          className="h-7 w-7 shadow-lg"
+          onClick={() => onRemove(url)}
+          aria-label="Rimuovi immagine"
+          data-testid={`button-remove-image-${index}`}
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+      
+      {/* Primary Badge */}
+      {index === 0 && (
+        <div className="absolute bottom-2 left-2">
+          <Badge variant="default" className="text-xs shadow-lg">
+            Foto Principale
+          </Badge>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function PropertyForm() {
   const [, navigate] = useLocation();
@@ -181,19 +268,26 @@ export default function PropertyForm() {
     setImageUrls(imageUrls.filter(img => img !== url));
   };
 
-  const moveImageUp = (index: number) => {
-    if (index > 0) {
-      const newUrls = [...imageUrls];
-      [newUrls[index], newUrls[index - 1]] = [newUrls[index - 1], newUrls[index]];
-      setImageUrls(newUrls);
-    }
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-  const moveImageDown = (index: number) => {
-    if (index < imageUrls.length - 1) {
-      const newUrls = [...imageUrls];
-      [newUrls[index], newUrls[index + 1]] = [newUrls[index + 1], newUrls[index]];
-      setImageUrls(newUrls);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setImageUrls((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
     }
   };
 
@@ -576,64 +670,26 @@ export default function PropertyForm() {
               </ObjectUploader>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {imageUrls.map((url, idx) => (
-                <div key={idx} className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-                  <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                  
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-                  
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="h-7 w-7 shadow-lg"
-                      onClick={() => removeImage(url)}
-                      aria-label="Rimuovi immagine"
-                      data-testid={`button-remove-image-${idx}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+            {imageUrls.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={imageUrls} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {imageUrls.map((url, idx) => (
+                      <DraggableImage
+                        key={url}
+                        url={url}
+                        index={idx}
+                        onRemove={removeImage}
+                      />
+                    ))}
                   </div>
-                  
-                  <div className="absolute bottom-2 left-2 flex gap-1">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7 shadow-lg"
-                      onClick={() => moveImageUp(idx)}
-                      disabled={idx === 0}
-                      aria-label="Sposta immagine su"
-                      data-testid={`button-move-up-${idx}`}
-                    >
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7 shadow-lg"
-                      onClick={() => moveImageDown(idx)}
-                      disabled={idx === imageUrls.length - 1}
-                      aria-label="Sposta immagine giù"
-                      data-testid={`button-move-down-${idx}`}
-                    >
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  
-                  {idx === 0 && (
-                    <div className="absolute top-2 left-2">
-                      <Badge variant="default" className="text-xs shadow-lg">
-                        Foto Principale
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                </SortableContext>
+              </DndContext>
+            ) : null}
 
             {imageUrls.length === 0 && (
               <div className="text-center py-12 border-2 border-dashed rounded-lg">
