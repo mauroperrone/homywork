@@ -133,10 +133,7 @@ export default function Checkout() {
   const [clientSecret, setClientSecret] = useState("");
 
   useEffect(() => {
-    console.log("[Checkout] useEffect triggered", { propertyId, checkIn, checkOut, totalPrice, isAuthenticated, authLoading });
-    
     if (!authLoading && !isAuthenticated) {
-      console.log("[Checkout] Not authenticated, redirecting to login");
       toast({
         title: "Autenticazione Richiesta",
         description: "Devi effettuare il login per completare la prenotazione.",
@@ -149,7 +146,6 @@ export default function Checkout() {
     }
 
     if (!propertyId || !checkIn || !checkOut || totalPrice <= 0) {
-      console.log("[Checkout] Missing params, redirecting to home", { propertyId, checkIn, checkOut, totalPrice });
       toast({
         title: "Dati Mancanti",
         description: "Informazioni di prenotazione non valide.",
@@ -159,18 +155,15 @@ export default function Checkout() {
       return;
     }
 
-    console.log("[Checkout] Creating payment intent...");
     // Create payment intent
     apiRequest("POST", "/api/create-payment-intent", {
       amount: totalPrice,
       propertyId,
     })
       .then((data: any) => {
-        console.log("[Checkout] Payment intent created, clientSecret:", data.clientSecret?.substring(0, 20) + "...");
         setClientSecret(data.clientSecret);
       })
-      .catch((error) => {
-        console.error("[Checkout] Failed to create payment intent:", error);
+      .catch(() => {
         toast({
           title: "Errore",
           description: "Impossibile inizializzare il pagamento.",
