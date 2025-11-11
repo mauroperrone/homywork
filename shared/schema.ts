@@ -117,7 +117,11 @@ export const insertPropertySchema = createInsertSchema(properties).omit({
 }).extend({
   images: z.array(z.string()).optional().default([]),
   amenities: z.array(z.string()),
-  wifiSpeed: z.number().min(1, "Velocità WiFi deve essere almeno 1 Mbps").optional(),
+  wifiSpeed: z.number()
+    .min(1, "Velocità WiFi deve essere almeno 1 Mbps")
+    .max(2000, "Velocità WiFi massima: 2000 Mbps")
+    .int("Velocità WiFi deve essere un numero intero")
+    .optional(),
 });
 
 export const insertBookingSchema = createInsertSchema(bookings).omit({

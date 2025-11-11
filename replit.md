@@ -26,7 +26,75 @@ HomyWork is built as a single-page application (SPA) with a clear separation bet
 - **File Uploads**: Uppy library is used for image uploads, refactored for Safari compatibility using Shadcn Dialog and Uppy's inline Dashboard.
 - **Image Management**: Includes features for deleting, reordering, and setting primary images with visual feedback.
 - **Calendar Synchronization**: Supports iCal URL imports (Airbnb, Booking.com) and native Google Calendar API integration via OAuth for availability management.
-- **WiFi Speed Test**: An integrated component in the property registration form to measure and record WiFi speeds.
+- **WiFi Speed Test**: Integrated component in property forms supporting both manual input and automated testing. Hosts can enter known WiFi speeds directly or run simulated speed tests. Values persist permanently in the database and display on property detail pages with quality badges.
+
+## Recent Feature Implementations
+
+### WiFi Speed Persistence (November 2025)
+**Status**: ✅ Completed and Tested
+
+**Problem Solved:**
+WiFi speed test results were not persisting in the database. When hosts edited properties, the WiFi speed value would reset, and it didn't appear in property detail pages.
+
+**Implementation:**
+
+1. **WiFiSpeedTest Component Refactored** (`client/src/components/WiFiSpeedTest.tsx`):
+   - Transformed into controlled component with `value` and `onChange` props
+   - Added visible numeric input field (data-testid="input-wifi-speed")
+   - Validation: min="0", max="2000", type="number", integer values only
+   - Supports **two input methods**:
+     - **Manual Entry**: Direct input for known WiFi speeds
+     - **Automatic Test**: Simulated speed test (20-170 Mbps random)
+   - Real-time quality feedback with colored badges:
+     - ≥100 Mbps: "Eccellente" (green)
+     - 50-99 Mbps: "Buona" (blue)
+     - <50 Mbps: "Sufficiente" (yellow)
+
+2. **PropertyForm Integration** (`client/src/pages/PropertyForm.tsx`):
+   - WiFiSpeedTest receives `value={wifiSpeed}` and `onChange={setWifiSpeed}`
+   - Pre-populates wifiSpeed from existingProperty when editing
+   - Submit includes wifiSpeed **only if defined**: `...(wifiSpeed !== undefined && { wifiSpeed })`
+   - This prevents overwriting existing values with `undefined` during edits
+
+3. **Database Schema** (`shared/schema.ts`):
+   - Field: `wifiSpeed: integer("wifi_speed")` (nullable)
+   - Validation: Zod schema with min=1, max=2000, integer-only
+   - Backend storage auto-handles via spread operator
+
+4. **PropertyDetail Display** (`client/src/pages/PropertyDetail.tsx`):
+   - WiFi speed badge appears when property.wifiSpeed is truthy
+   - Shows: `<Wifi icon> {wifiSpeed} Mbps`
+   - Badge color matches quality rating
+   - data-testid="badge-wifi-speed"
+
+**Behavior:**
+- ✅ **Create property**: WiFi speed saved if entered (manual or test)
+- ✅ **Edit property without touching WiFi**: Previous value persists
+- ✅ **Edit property with new WiFi value**: Updates to new value
+- ✅ **Manual input**: Type speed directly (e.g., 150)
+- ✅ **Automatic test**: Click button, progress bar, result auto-fills input
+- ✅ **Display**: Badge visible on property page with icon and quality label
+
+**Testing:**
+- End-to-end test passed all scenarios:
+  - Property creation with manual WiFi (150 Mbps) → persisted
+  - Property edit changing WiFi (150 → 200) → persisted
+  - Property edit without touching WiFi → value retained
+  - Automatic test (resulted in 136 Mbps) → persisted
+  - Badge display verified on property detail page
+
+**User Experience:**
+- Input field always visible for transparency
+- Helper text: "Velocità minima raccomandata: 50 Mbps per smart working"
+- Dual options clearly explained: "Inserisci la velocità manualmente o esegui un test automatico"
+- Button label changes based on state: "Avvia Test Automatico" / "Ripeti Test Automatico"
+- Input disabled during test to prevent conflicts
+
+**Technical Notes:**
+- Component follows React controlled component pattern
+- Form state is single source of truth (react-hook-form compatible)
+- Conditional payload inclusion prevents null overwrites
+- Validation enforced at component, schema, and database levels
 
 ### Feature Specifications
 - **Guest Features**: Advanced property search (location, guests, price, WiFi speed), booking system, user profile for managing bookings and favorites.
