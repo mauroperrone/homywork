@@ -72,6 +72,45 @@ HomyWork è un portale per affitti brevi specializzato per smartworkers e nomadi
 - ✅ UX migliorata con pagina onboarding dedicata
 - ✅ Zero errori 404 sulla creazione proprietà
 
+### Problema: Modifica Proprietà Mancante (404)
+**Issue**: Gli host che cliccavano "Modifica" nel Dashboard venivano reindirizzati a `/proprieta/:id/modifica` ricevendo errore 404 "Page not found".
+
+**Root Cause**:
+- Il link "Modifica" in Dashboard puntava a `/proprieta/:id/modifica`
+- In App.tsx mancava completamente questa route
+- Wouter faceva match con la route di fallback NotFound → 404
+
+**Fix Implementata**:
+1. **Aggiunta route `/proprieta/:id/modifica`** in App.tsx:
+   - Posizionata PRIMA di `/proprieta/:id` per evitare conflitti
+   - Usa stesso componente PropertyForm con ProtectedRoute (host)
+
+2. **PropertyForm supporta modalità edit**:
+   - Usa `useParams()` per rilevare se c'è `id` nell'URL → `isEditing = true`
+   - `useQuery` carica dati proprietà esistente se `isEditing`
+   - `useEffect` popola form con `form.reset(existingProperty)` quando arrivano i dati
+   - Sincronizza stati derivati: `imageUrls`, `selectedAmenities`, `wifiSpeed`
+   - Mostra skeleton durante caricamento
+   - Mostra errore se proprietà non trovata o permessi negati
+
+3. **Submit differenziato**:
+   - `createPropertyMutation` → POST `/api/properties` (nuova proprietà)
+   - `updatePropertyMutation` → PATCH `/api/properties/:id` (modifica)
+   - `onSubmit` sceglie mutation appropriata basato su `isEditing`
+   - Invalida cache: `/api/properties`, `/api/properties/:id`, `/api/host/properties`
+
+4. **UI aggiornata per modalità edit**:
+   - Titolo: "Modifica Proprietà" vs "Registra la tua Proprietà"
+   - Descrizione: "Aggiorna i dettagli" vs "Inserisci i dettagli"
+   - Pulsante submit: "Salva Modifiche" / "Salvataggio..." vs "Pubblica Proprietà" / "Creazione..."
+
+**Impact**:
+- ✅ Gli host possono ora modificare proprietà esistenti
+- ✅ Form si pre-popola automaticamente con dati esistenti
+- ✅ Validazione ownership garantita dal backend (middleware isHost)
+- ✅ UX migliorata con feedback chiaro (skeleton, errori, toast)
+- ✅ Test end-to-end passato: creazione → modifica → salvataggio → visualizzazione aggiornamenti
+
 ## 🔐 Sistema di Sicurezza Implementato (Ottobre 2025)
 
 ### Middleware Role-Based
