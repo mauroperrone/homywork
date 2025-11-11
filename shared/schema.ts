@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: text("role").notNull().default("guest"), // 'guest', 'host', o 'admin'
+  stripeAccountId: varchar("stripe_account_id"), // Stripe Connect Express account ID
+  stripeOnboardingComplete: boolean("stripe_onboarding_complete").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
