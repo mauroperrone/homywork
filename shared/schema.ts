@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -81,7 +81,9 @@ export const availability = pgTable("availability", {
   date: timestamp("date").notNull(),
   isAvailable: boolean("is_available").notNull().default(true),
   source: text("source").notNull().default("manual"), // 'manual', 'airbnb', 'booking', 'google'
-});
+}, (table) => ({
+  uniquePropertyDate: unique("UQ_availability_property_date").on(table.propertyId, table.date),
+}));
 
 // Tabella sincronizzazioni calendario
 export const calendarSyncs = pgTable("calendar_syncs", {

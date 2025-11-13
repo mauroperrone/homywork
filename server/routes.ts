@@ -8,6 +8,8 @@ import { ObjectPermission } from "./objectAcl";
 import Stripe from "stripe";
 import { eq, and, sql } from "drizzle-orm";
 import { processScheduledPayouts } from "./scheduler";
+import { z } from "zod";
+import { ValidationError } from "./storage";
 import { 
   bookings,
   insertPropertySchema, 
@@ -561,6 +563,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching availability:", error);
       res.status(500).json({ message: "Failed to fetch availability" });
+    }
+  });
+
+  app.post('/api/properties/:propertyId/availability', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const propertyId = req.params.propertyId;
+
+      const availabilitySchema = z.object({
+        date: z.string().refine((val) => !isNaN(Date.parse(val)), {
+          message: "Invalid date format. Expected ISO date string (e.g., '2025-01-15')",
+        }),
+        isAvailable: z.boolean(),
+      });
+
+      const validatedData = availabilitySchema.parse(req.body);
+
+      const property = await storage.getProperty(propertyId);
+      if (!property || property.hostId !== userId) {
+        return res.status(403).json({ message: "Not authorized to modify availability for this property" });
+      }
+
+      await storage.setDateAvailability(
+        propertyId,
+        new Date(validatedData.date),
+        validatedData.isAvailable,
+        'manual'
+      );
+      res.status(200).json({ message: "Availability updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating availability:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      if (error instanceof ValidationError) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

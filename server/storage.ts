@@ -9,6 +9,13 @@ import {
   type Review, type InsertReview
 } from "@shared/schema";
 
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
 export interface IStorage {
   // Users - Required for Replit Auth
   getUser(id: string): Promise<User | undefined>;
@@ -56,6 +63,8 @@ export interface IStorage {
   checkAvailability(propertyId: string, checkIn: Date, checkOut: Date): Promise<boolean>;
   getPropertyAvailability(propertyId: string): Promise<any[]>;
   blockDates(propertyId: string, dates: Date[], source: string): Promise<void>;
+  setDateAvailability(propertyId: string, date: Date, isAvailable: boolean, source: string): Promise<void>;
+  removeDateAvailability(propertyId: string, date: Date): Promise<void>;
   
   // Calendar Syncs
   getCalendarSync(id: string): Promise<CalendarSync | undefined>;
@@ -378,6 +387,76 @@ export class DbStorage implements IStorage {
     if (values.length > 0) {
       await db.insert(availability).values(values);
     }
+  }
+
+  async setDateAvailability(propertyId: string, date: Date, isAvailable: boolean, source: string): Promise<void> {
+    const normalizedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+    if (Number.isNaN(normalizedDate.getTime())) {
+      throw new ValidationError("Invalid date provided");
+    }
+
+    if (isAvailable) {
+      const conflictingBookings = await db
+        .select()
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.propertyId, propertyId),
+            eq(bookings.status, "confirmed"),
+            sql`DATE(${bookings.checkIn}) <= DATE(${normalizedDate})`,
+            sql`DATE(${bookings.checkOut}) > DATE(${normalizedDate})`
+          )
+        );
+
+      if (conflictingBookings.length > 0) {
+        throw new ValidationError("Cannot set date as available: there is a confirmed booking for this date");
+      }
+    }
+
+    await db.insert(availability)
+      .values({
+        propertyId,
+        date: normalizedDate,
+        isAvailable,
+        source,
+      })
+      .onConflictDoUpdate({
+        target: [availability.propertyId, availability.date],
+        set: { isAvailable, source },
+      });
+  }
+
+  async removeDateAvailability(propertyId: string, date: Date): Promise<void> {
+    const normalizedDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+    if (Number.isNaN(normalizedDate.getTime())) {
+      throw new ValidationError("Invalid date provided");
+    }
+
+    const conflictingBookings = await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.propertyId, propertyId),
+          eq(bookings.status, "confirmed"),
+          sql`DATE(${bookings.checkIn}) <= DATE(${normalizedDate})`,
+          sql`DATE(${bookings.checkOut}) > DATE(${normalizedDate})`
+        )
+      );
+
+    if (conflictingBookings.length > 0) {
+      throw new ValidationError("Cannot remove availability block: there is a confirmed booking for this date");
+    }
+
+    await db.delete(availability)
+      .where(
+        and(
+          eq(availability.propertyId, propertyId),
+          eq(availability.date, normalizedDate)
+        )
+      );
   }
 
   // Calendar Syncs
