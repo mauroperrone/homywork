@@ -11,6 +11,7 @@ import type { Property, Booking } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StripeConnectOnboarding } from "@/components/StripeConnectOnboarding";
 import { HostCalendar } from "@/components/HostCalendar";
+import { CalendarSync } from "@/components/CalendarSync";
 
 export default function Dashboard() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
@@ -199,7 +200,10 @@ export default function Dashboard() {
               </Card>
               
               {selectedPropertyId && (
-                <HostCalendar propertyId={selectedPropertyId} />
+                <>
+                  <CalendarSync propertyId={selectedPropertyId} />
+                  <HostCalendar propertyId={selectedPropertyId} />
+                </>
               )}
             </>
           ) : (
