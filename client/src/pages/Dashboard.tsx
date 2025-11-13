@@ -119,7 +119,7 @@ export default function Dashboard() {
         <Card className="p-6">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-chart-3/10 rounded-full">
-              <Calendar className="h-6 w-6 text-chart-3" />
+              <CalendarIcon className="h-6 w-6 text-chart-3" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Prenotazioni</p>

@@ -95,14 +95,14 @@ export function HostCalendar({ propertyId }: HostCalendarProps) {
   // Check if date is blocked
   const isDateBlocked = (date: Date): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const avail = availability.find(a => a.date === dateStr);
+    const avail = availability.find(a => a.date.startsWith(dateStr));
     return avail ? !avail.isAvailable : false;
   };
 
   // Check if date is available
   const isDateAvailable = (date: Date): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const avail = availability.find(a => a.date === dateStr);
+    const avail = availability.find(a => a.date.startsWith(dateStr));
     return avail ? avail.isAvailable : true; // Default available if not set
   };
 
