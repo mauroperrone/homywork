@@ -1,14 +1,19 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
-import { Plus, Home, Calendar, Euro, TrendingUp } from "lucide-react";
+import { Plus, Home, Calendar as CalendarIcon, Euro, TrendingUp } from "lucide-react";
 import type { Property, Booking } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StripeConnectOnboarding } from "@/components/StripeConnectOnboarding";
+import { HostCalendar } from "@/components/HostCalendar";
 
 export default function Dashboard() {
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
   const { data: properties, isLoading: propertiesLoading } = useQuery<Property[]>({
     queryKey: ["/api/host/properties"],
   });
@@ -16,6 +21,11 @@ export default function Dashboard() {
   const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
     queryKey: ["/api/host/bookings"],
   });
+
+  // Auto-select first property when properties load (useEffect to avoid setState in render)
+  if (!selectedPropertyId && properties && properties.length > 0) {
+    setTimeout(() => setSelectedPropertyId(properties[0].id), 0);
+  }
 
   const stats = {
     totalProperties: properties?.length || 0,
@@ -147,11 +157,72 @@ export default function Dashboard() {
         <StripeConnectOnboarding />
       </div>
 
-      {/* Properties List */}
-      <Card className="p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Le Tue Proprietà</h2>
-        
-        {propertiesLoading ? (
+      {/* Tabs for Calendario, Proprietà, Prenotazioni */}
+      <Tabs defaultValue="properties" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3" data-testid="tabs-dashboard">
+          <TabsTrigger value="calendar" data-testid="tab-calendar">
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            Calendario
+          </TabsTrigger>
+          <TabsTrigger value="properties" data-testid="tab-properties">
+            <Home className="h-4 w-4 mr-2" />
+            Proprietà
+          </TabsTrigger>
+          <TabsTrigger value="bookings" data-testid="tab-bookings">
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            Prenotazioni
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Calendar Tab */}
+        <TabsContent value="calendar" className="space-y-4">
+          {properties && properties.length > 0 ? (
+            <>
+              <Card className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <label htmlFor="property-select" className="text-sm font-medium whitespace-nowrap">
+                    Seleziona Proprietà:
+                  </label>
+                  <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+                    <SelectTrigger id="property-select" className="w-full" data-testid="select-property-calendar">
+                      <SelectValue placeholder="Seleziona una proprietà" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {properties.map((property) => (
+                        <SelectItem key={property.id} value={property.id}>
+                          {property.title} - {property.city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </Card>
+              
+              {selectedPropertyId && (
+                <HostCalendar propertyId={selectedPropertyId} />
+              )}
+            </>
+          ) : (
+            <Card className="p-6">
+              <div className="text-center py-12">
+                <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground mb-4" data-testid="text-no-properties-calendar">
+                  Non hai ancora proprietà da gestire
+                </p>
+                <Button asChild>
+                  <Link href="/proprieta/nuova">Pubblica la Prima Proprietà</Link>
+                </Button>
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Properties Tab */}
+        <TabsContent value="properties">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Le Tue Proprietà</h2>
+            
+            {propertiesLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
               <div key={i} className="flex gap-4">
@@ -211,13 +282,15 @@ export default function Dashboard() {
             </Button>
           </div>
         )}
-      </Card>
+          </Card>
+        </TabsContent>
 
-      {/* Recent Bookings */}
-      <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Prenotazioni Recenti</h2>
-        
-        {bookingsLoading ? (
+        {/* Bookings Tab */}
+        <TabsContent value="bookings">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Prenotazioni Recenti</h2>
+            
+            {bookingsLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
               <Skeleton key={i} className="h-16 w-full" />
@@ -256,7 +329,9 @@ export default function Dashboard() {
             </p>
           </div>
         )}
-      </Card>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
