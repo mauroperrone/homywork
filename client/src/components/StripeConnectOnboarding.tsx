@@ -3,7 +3,18 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, ExternalLink, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { CreditCard, ExternalLink, Loader2, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -42,6 +53,26 @@ export function StripeConnectOnboarding() {
       toast({
         title: "Errore",
         description: error.message || "Errore durante la creazione dell'account Stripe",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", "/api/host/stripe/delete-account");
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/host/stripe/status"] });
+      toast({
+        title: "Account Eliminato",
+        description: "Il tuo account Stripe è stato eliminato con successo.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Errore durante l'eliminazione dell'account Stripe",
         variant: "destructive",
       });
     },
@@ -155,23 +186,67 @@ export function StripeConnectOnboarding() {
               Il tuo account Stripe è stato creato ma la configurazione non è completa.
               Completa i passaggi richiesti da Stripe per iniziare a ricevere pagamenti.
             </p>
-            <Button
-              onClick={() => startOnboarding()}
-              disabled={isRedirecting}
-              data-testid="button-complete-onboarding"
-            >
-              {isRedirecting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Reindirizzamento...
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Completa Configurazione
-                </>
-              )}
-            </Button>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => startOnboarding()}
+                disabled={isRedirecting}
+                data-testid="button-complete-onboarding"
+              >
+                {isRedirecting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Reindirizzamento...
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Completa Configurazione
+                  </>
+                )}
+              </Button>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteAccountMutation.isPending}
+                    data-testid="button-delete-stripe-account"
+                  >
+                    {deleteAccountMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Eliminazione...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Elimina Account
+                      </>
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Questa azione eliminerà definitivamente il tuo account Stripe Connect.
+                      Non potrai più ricevere pagamenti fino a quando non ne creerai uno nuovo.
+                      Questa azione non può essere annullata.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-cancel-delete">Annulla</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteAccountMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      data-testid="button-confirm-delete"
+                    >
+                      Elimina
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </Card>
@@ -214,6 +289,48 @@ export function StripeConnectOnboarding() {
                 </>
               )}
             </Button>
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  disabled={deleteAccountMutation.isPending}
+                  data-testid="button-delete-stripe-account"
+                >
+                  {deleteAccountMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Eliminazione...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Elimina Account
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Questa azione eliminerà definitivamente il tuo account Stripe Connect.
+                    Non potrai più ricevere pagamenti fino a quando non ne creerai uno nuovo.
+                    Questa azione non può essere annullata.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteAccountMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="button-confirm-delete"
+                  >
+                    Elimina
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </div>

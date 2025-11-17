@@ -408,14 +408,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const stripeAccountId = user.stripeAccountId;
 
-      await stripe.accounts.del(stripeAccountId);
+      try {
+        await stripe.accounts.del(stripeAccountId);
+      } catch (stripeError: any) {
+        console.error("Stripe API error deleting account:", stripeError);
+        
+        if (stripeError.type === 'StripeInvalidRequestError') {
+          return res.status(400).json({ 
+            message: "Impossibile eliminare l'account Stripe. Potrebbe avere un saldo in sospeso o transazioni in corso." 
+          });
+        }
+        
+        return res.status(500).json({ 
+          message: "Errore durante l'eliminazione dell'account Stripe. Riprova più tardi." 
+        });
+      }
 
       await storage.updateUserStripeAccount(userId, null, false);
+
+      console.log(`Stripe account ${stripeAccountId} deleted for user ${userId}`);
 
       res.json({ deleted: true, message: "Account Stripe eliminato con successo" });
     } catch (error: any) {
       console.error("Error deleting Stripe account:", error);
-      res.status(500).json({ message: "Error deleting Stripe account: " + error.message });
+      res.status(500).json({ message: "Errore imprevisto durante l'eliminazione dell'account" });
     }
   });
 
