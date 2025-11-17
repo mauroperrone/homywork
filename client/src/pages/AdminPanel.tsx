@@ -6,8 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Users, Home } from "lucide-react";
+import { Shield, Users, Home, Trash2, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminPanel() {
@@ -59,6 +70,26 @@ export default function AdminPanel() {
         variant: "destructive",
         title: "Errore",
         description: "Impossibile aggiornare lo stato della proprietà.",
+      });
+    },
+  });
+
+  const deleteStripeAccountMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest('DELETE', `/api/admin/stripe/delete-account/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: "Account Stripe Eliminato",
+        description: "L'account Stripe è stato eliminato con successo.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Errore",
+        description: error.message || "Impossibile eliminare l'account Stripe. L'account potrebbe avere un saldo non pari a zero.",
       });
     },
   });
@@ -126,6 +157,11 @@ export default function AdminPanel() {
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} data-testid={`badge-role-${user.id}`}>
                           {user.role === 'admin' ? 'Admin' : user.role === 'host' ? 'Host' : 'Guest'}
                         </Badge>
+                        {user.stripeAccountId && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-stripe-${user.id}`}>
+                            Stripe
+                          </Badge>
+                        )}
                         <Select
                           value={user.role}
                           onValueChange={(role) => updateUserRoleMutation.mutate({ userId: user.id, role })}
@@ -140,6 +176,49 @@ export default function AdminPanel() {
                             <SelectItem value="admin">Admin</SelectItem>
                           </SelectContent>
                         </Select>
+                        {user.stripeAccountId && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deleteStripeAccountMutation.isPending}
+                                data-testid={`button-delete-stripe-${user.id}`}
+                              >
+                                {deleteStripeAccountMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminare account Stripe?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Sei sicuro di voler eliminare l'account Stripe di <strong>{user.firstName} {user.lastName}</strong>?
+                                  <br /><br />
+                                  Questa azione eliminerà definitivamente l'account Stripe Connect Express dell'utente.
+                                  L'account deve avere un saldo pari a zero per poter essere eliminato.
+                                  <br /><br />
+                                  Questa azione non può essere annullata.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel data-testid={`button-cancel-delete-stripe-${user.id}`}>
+                                  Annulla
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteStripeAccountMutation.mutate(user.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  data-testid={`button-confirm-delete-stripe-${user.id}`}
+                                >
+                                  Elimina Account Stripe
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </div>
                   ))}
