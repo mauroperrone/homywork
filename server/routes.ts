@@ -397,6 +397,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/host/stripe/delete-account', isHost, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeAccountId) {
+        return res.status(400).json({ message: "No Stripe account found" });
+      }
+
+      const stripeAccountId = user.stripeAccountId;
+
+      await stripe.accounts.del(stripeAccountId);
+
+      await storage.updateUserStripeAccount(userId, null, false);
+
+      res.json({ deleted: true, message: "Account Stripe eliminato con successo" });
+    } catch (error: any) {
+      console.error("Error deleting Stripe account:", error);
+      res.status(500).json({ message: "Error deleting Stripe account: " + error.message });
+    }
+  });
+
   // Create booking with payment
   app.post('/api/bookings', isAuthenticated, async (req: any, res) => {
     try {

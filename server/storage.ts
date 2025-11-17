@@ -23,7 +23,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(user: InsertUser): Promise<User>;
   updateUserRole(userId: string, role: string): Promise<User | undefined>;
-  updateUserStripeAccount(userId: string, stripeAccountId: string, onboardingComplete: boolean): Promise<User | undefined>;
+  updateUserStripeAccount(userId: string, stripeAccountId: string | null, onboardingComplete: boolean): Promise<User | undefined>;
 
   // Admin - User Management
   getAllUsers(): Promise<User[]>;
@@ -137,7 +137,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async updateUserStripeAccount(userId: string, stripeAccountId: string, onboardingComplete: boolean): Promise<User | undefined> {
+  async updateUserStripeAccount(userId: string, stripeAccountId: string | null, onboardingComplete: boolean): Promise<User | undefined> {
     const result = await db.update(users)
       .set({ 
         stripeAccountId, 
