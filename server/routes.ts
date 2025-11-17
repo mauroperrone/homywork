@@ -764,6 +764,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete('/api/admin/stripe/delete-account/:userId', isAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "Utente non trovato" });
+      }
+
+      if (!user.stripeAccountId) {
+        return res.status(400).json({ message: "L'utente non ha un account Stripe" });
+      }
+
+      const stripeAccountId = user.stripeAccountId;
+
+      try {
+        const balance = await stripe.balance.retrieve({
+          stripeAccount: stripeAccountId,
+        });
+
+        const hasNonZeroBalance = 
+          balance.available.some(b => b.amount !== 0) ||
+          balance.pending.some(b => b.amount !== 0);
+
+        if (hasNonZeroBalance) {
+          return res.status(400).json({ 
+            message: "Impossibile eliminare l'account. L'account ha un saldo disponibile o in sospeso non pari a zero." 
+          });
+        }
+
+        await stripe.accounts.del(stripeAccountId);
+      } catch (stripeError: any) {
+        console.error("Stripe API error deleting account:", stripeError);
+        
+        if (stripeError.type === 'StripeInvalidRequestError') {
+          return res.status(400).json({ 
+            message: "Impossibile eliminare l'account Stripe. Potrebbe avere un saldo in sospeso o transazioni in corso." 
+          });
+        }
+        
+        return res.status(500).json({ 
+          message: "Errore durante l'eliminazione dell'account Stripe. Riprova più tardi." 
+        });
+      }
+
+      await storage.updateUserStripeAccount(userId, null, false);
+
+      console.log(`[Admin] Stripe account ${stripeAccountId} deleted for user ${userId}`);
+
+      res.json({ 
+        deleted: true, 
+        message: "Account Stripe eliminato con successo",
+        userId,
+        email: user.email 
+      });
+    } catch (error: any) {
+      console.error("Error deleting Stripe account (admin):", error);
+      res.status(500).json({ message: "Errore imprevisto durante l'eliminazione dell'account" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
