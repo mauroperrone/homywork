@@ -28,14 +28,15 @@ export function StripeConnectOnboarding() {
       return await apiRequest("POST", "/api/host/stripe/create-account");
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["/api/host/stripe/status"] });
-      
+      // Don't invalidate queries yet - do it after onboarding redirect
+      // This prevents re-render that breaks the redirect flow
       toast({
         title: "Account Stripe Creato",
-        description: "Ora completa la configurazione con Stripe.",
+        description: "Reindirizzamento a Stripe...",
       });
       
-      await startOnboarding();
+      // Start onboarding immediately
+      startOnboarding();
     },
     onError: (error: Error) => {
       toast({
@@ -46,12 +47,24 @@ export function StripeConnectOnboarding() {
     },
   });
 
-  const startOnboarding = async () => {
+  const startOnboarding = async (retryCount = 0) => {
     try {
       setIsRedirecting(true);
       const response = await apiRequest("POST", "/api/host/stripe/onboarding-link");
-      window.location.href = response.url;
+      
+      if (response.url) {
+        // Redirect to Stripe onboarding
+        window.location.href = response.url;
+      } else {
+        throw new Error("No onboarding URL received");
+      }
     } catch (error: any) {
+      // Retry once after 1 second if account was just created
+      if (retryCount === 0 && error.message?.includes("No Stripe account")) {
+        setTimeout(() => startOnboarding(1), 1000);
+        return;
+      }
+      
       setIsRedirecting(false);
       toast({
         title: "Errore",
@@ -143,7 +156,7 @@ export function StripeConnectOnboarding() {
               Completa i passaggi richiesti da Stripe per iniziare a ricevere pagamenti.
             </p>
             <Button
-              onClick={startOnboarding}
+              onClick={() => startOnboarding()}
               disabled={isRedirecting}
               data-testid="button-complete-onboarding"
             >
