@@ -20,7 +20,7 @@ HomyWork is built as a single-page application (SPA) with a clear separation bet
 - **Backend**: Express.js with TypeScript.
 - **Authentication**: Replit Auth for various login methods, supporting role-based access control (`guest`, `host`, `admin`).
 - **Database**: PostgreSQL (Neon) managed with Drizzle ORM.
-- **Payments**: Stripe integrated for secure processing, including Stripe Connect Express for host payouts with a 10% platform fee. Payments are held until check-in + 1 day before transfer to hosts.
+- **Payments**: Stripe integrated for secure processing, including Stripe Connect Express for host payouts with a 10% platform fee. Payments are held until check-in + 1 day before transfer to hosts. Hosts can delete their Stripe Connect account via the dashboard with confirmation dialog. The system automatically detects and cleans up invalid/deleted Stripe accounts.
 - **Object Storage**: Used for property images with Uppy for file uploads, including image management features (delete, reorder, primary image).
 - **Calendar Synchronization**: Supports iCal URL imports (Airbnb, Booking.com) and native Google Calendar API integration via OAuth.
 - **WiFi Speed Test**: Integrated component in property forms for manual input or automated testing. Speeds are persisted and displayed with quality badges.

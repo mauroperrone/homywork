@@ -359,20 +359,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const account = await stripe.accounts.retrieve(user.stripeAccountId);
+      try {
+        const account = await stripe.accounts.retrieve(user.stripeAccountId);
 
-      const onboardingComplete = account.details_submitted && account.charges_enabled;
+        const onboardingComplete = account.details_submitted && account.charges_enabled;
 
-      if (onboardingComplete !== user.stripeOnboardingComplete) {
-        await storage.updateUserStripeAccount(user.stripeAccountId, user.stripeAccountId, onboardingComplete);
+        if (onboardingComplete !== user.stripeOnboardingComplete) {
+          await storage.updateUserStripeAccount(userId, user.stripeAccountId, onboardingComplete);
+        }
+
+        res.json({
+          hasAccount: true,
+          onboardingComplete,
+          chargesEnabled: account.charges_enabled,
+          payoutsEnabled: account.payouts_enabled,
+        });
+      } catch (stripeError: any) {
+        console.error("Stripe account error:", stripeError);
+        
+        const isAccountMissing = 
+          (stripeError.type === 'StripePermissionError' && stripeError.code === 'account_invalid') ||
+          (stripeError.type === 'StripeInvalidRequestError' && stripeError.code === 'resource_missing');
+        
+        if (isAccountMissing) {
+          console.log(`Stripe account ${user.stripeAccountId} no longer exists - clearing from database for user ${userId}`);
+          await storage.updateUserStripeAccount(userId, null, false);
+          
+          return res.json({ 
+            hasAccount: false,
+            onboardingComplete: false,
+            chargesEnabled: false 
+          });
+        }
+        
+        throw stripeError;
       }
-
-      res.json({
-        hasAccount: true,
-        onboardingComplete,
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled,
-      });
     } catch (error: any) {
       console.error("Error checking Stripe status:", error);
       res.status(500).json({ message: "Error checking Stripe status: " + error.message });
