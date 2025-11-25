@@ -1,12 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Search, Menu, User as UserIcon, Heart, Home } from "lucide-react";
+import { Menu, Heart } from "lucide-react";
 import { useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,26 +30,54 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
       <div className="container mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md px-2 py-1 -ml-2" data-testid="link-home">
+          <Link
+            href="/"
+            className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md px-2 py-1 -ml-2"
+            data-testid="link-home"
+          >
             <img src={homyWorkLogo} alt="HomyWork Logo" className="h-8 w-8" />
             <span className="text-xl font-bold font-ubuntu">HomyWork</span>
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6 flex-1 justify-center">
-            <Link href="/" className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${location === "/" ? "text-foreground" : "text-muted-foreground"}`} data-testid="link-home-nav">
+            <Link
+              href="/"
+              className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${
+                location === "/" ? "text-foreground" : "text-muted-foreground"
+              }`}
+              data-testid="link-home-nav"
+            >
               Home
             </Link>
-            <Link href="/cerca" className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${location === "/cerca" ? "text-foreground" : "text-muted-foreground"}`} data-testid="link-search">
+            <Link
+              href="/cerca"
+              className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${
+                location === "/cerca" ? "text-foreground" : "text-muted-foreground"
+              }`}
+              data-testid="link-search"
+            >
               Cerca
             </Link>
             {user?.role === "host" && (
-              <Link href="/dashboard" className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${location === "/dashboard" ? "text-foreground" : "text-muted-foreground"}`} data-testid="link-dashboard">
+              <Link
+                href="/dashboard"
+                className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${
+                  location === "/dashboard" ? "text-foreground" : "text-muted-foreground"
+                }`}
+                data-testid="link-dashboard"
+              >
                 Dashboard
               </Link>
             )}
             {user?.role === "admin" && (
-              <Link href="/admin" className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${location === "/admin" ? "text-foreground" : "text-muted-foreground"}`} data-testid="link-admin">
+              <Link
+                href="/admin"
+                className={`text-sm font-medium hover-elevate active-elevate-2 rounded-md px-3 py-2 ${
+                  location === "/admin" ? "text-foreground" : "text-muted-foreground"
+                }`}
+                data-testid="link-admin"
+              >
                 Admin
               </Link>
             )}
@@ -74,7 +98,7 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                     <Heart className="h-5 w-5" />
                   </Link>
                 </Button>
-                
+
                 {user.role === "guest" && (
                   <Button
                     variant="outline"
@@ -88,15 +112,23 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
               </>
             )}
 
-            {/* User Menu */}
+            {/* User Menu / Login */}
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    data-testid="button-user-menu"
+                  >
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || 'User'} />
+                      <AvatarImage
+                        src={user.profileImageUrl || undefined}
+                        alt={user.firstName || "User"}
+                      />
                       <AvatarFallback>
-                        {(user.firstName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                        {(user.firstName?.[0] || user.email?.[0] || "U").toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -104,25 +136,37 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium" data-testid="text-user-name">
-                      {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || user.email?.split('@')[0] || 'Utente'}
+                      {user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : user.firstName || user.email?.split("@")[0] || "Utente"}
                     </p>
-                    <p className="text-xs text-muted-foreground" data-testid="text-user-email">{user.email}</p>
+                    <p className="text-xs text-muted-foreground" data-testid="text-user-email">
+                      {user.email}
+                    </p>
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profilo" data-testid="link-profile">Il mio profilo</Link>
+                    <Link href="/profilo" data-testid="link-profile">
+                      Il mio profilo
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/prenotazioni" data-testid="link-bookings">Le mie prenotazioni</Link>
+                    <Link href="/prenotazioni" data-testid="link-bookings">
+                      Le mie prenotazioni
+                    </Link>
                   </DropdownMenuItem>
                   {user.role === "host" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard" data-testid="link-dashboard-menu">Dashboard Host</Link>
+                      <Link href="/dashboard" data-testid="link-dashboard-menu">
+                        Dashboard Host
+                      </Link>
                     </DropdownMenuItem>
                   )}
                   {user.role === "admin" && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin" data-testid="link-admin-menu">Pannello Admin</Link>
+                      <Link href="/admin" data-testid="link-admin-menu">
+                        Pannello Admin
+                      </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
@@ -162,6 +206,7 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                   >
                     Cerca
                   </Link>
+
                   {user?.role === "host" && (
                     <Link
                       href="/dashboard"
@@ -172,6 +217,7 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                       Dashboard
                     </Link>
                   )}
+
                   {user?.role === "admin" && (
                     <Link
                       href="/admin"
@@ -182,7 +228,8 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                       Admin
                     </Link>
                   )}
-                  {user && (
+
+                  {user ? (
                     <>
                       <Link
                         href="/preferiti"
@@ -202,7 +249,29 @@ export function Navbar({ user, onAuthClick, onLogout }: NavbarProps) {
                           Diventa Host
                         </Link>
                       )}
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          onLogout();
+                        }}
+                        data-testid="button-logout-mobile"
+                      >
+                        Esci
+                      </Button>
                     </>
+                  ) : (
+                    <Button
+                      className="mt-2"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onAuthClick();
+                      }}
+                      data-testid="button-login-mobile"
+                    >
+                      Accedi
+                    </Button>
                   )}
                 </nav>
               </SheetContent>

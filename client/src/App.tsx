@@ -25,42 +25,51 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/cerca" component={SearchPage} />
+
       <Route path="/proprieta/nuova">
         <ProtectedRoute requiredRole="host">
           <PropertyForm />
         </ProtectedRoute>
       </Route>
+
       <Route path="/proprieta/:id/modifica">
         <ProtectedRoute requiredRole="host">
           <PropertyForm />
         </ProtectedRoute>
       </Route>
+
       <Route path="/proprieta/:id" component={PropertyDetail} />
+
       <Route path="/dashboard">
         <ProtectedRoute requiredRole="host">
           <Dashboard />
         </ProtectedRoute>
       </Route>
+
       <Route path="/diventa-host">
         <ProtectedRoute requireAuth>
           <BecomeHost />
         </ProtectedRoute>
       </Route>
+
       <Route path="/checkout">
         <ProtectedRoute requireAuth>
           <Checkout />
         </ProtectedRoute>
       </Route>
+
       <Route path="/admin">
         <ProtectedRoute requiredRole="admin">
           <AdminPanel />
         </ProtectedRoute>
       </Route>
+
       <Route path="/profilo">
         <ProtectedRoute requireAuth>
           <UserProfile />
         </ProtectedRoute>
       </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -70,15 +79,23 @@ function AppContent() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const { user } = useAuth();
 
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // anche se fallisce, forziamo comunque il refresh
+    } finally {
+      window.location.reload();
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar
         user={user}
-        onAuthClick={() => setAuthModalOpen(true)}
+        onAuthClick={() => {
+          window.location.href = "/auth/google";
+        }}
         onLogout={handleLogout}
       />
       <Router />

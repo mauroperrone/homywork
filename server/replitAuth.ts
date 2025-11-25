@@ -1,245 +1,164 @@
-import * as client from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+// server/replitAuth.ts
 import passport from "passport";
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
-import memoize from "memoizee";
+import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
+import type {
+  Express,
+  Request,
+  Response,
+  NextFunction,
+  RequestHandler,
+} from "express";
 import connectPg from "connect-pg-simple";
-import { storage } from "./storage";
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+/**
+ * VARIABILI D'AMBIENTE OBBLIGATORIE
+ */
+if (!process.env.DATABASE_URL) {
+  throw new Error("Environment variable DATABASE_URL not provided");
+}
+if (!process.env.SESSION_SECRET) {
+  throw new Error("Environment variable SESSION_SECRET not provided");
+}
+if (!process.env.GOOGLE_CLIENT_ID) {
+  throw new Error("Environment variable GOOGLE_CLIENT_ID not provided");
+}
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  throw new Error("Environment variable GOOGLE_CLIENT_SECRET not provided");
+}
+if (!process.env.GOOGLE_CALLBACK_URL) {
+  throw new Error("Environment variable GOOGLE_CALLBACK_URL not provided");
 }
 
-const getOidcConfig = memoize(
-  async () => {
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
-    );
-  },
-  { maxAge: 3600 * 1000 }
-);
+/**
+ * SESSIONE CON POSTGRES (connect-pg-simple)
+ */
+export function getSession(): RequestHandler {
+  const PgStore = connectPg(session);
+  const sessionTtlMs = 7 * 24 * 60 * 60 * 1000; // 7 giorni
 
-export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
+  const store = new PgStore({
     conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
+    tableName: "sessions", // Assicurati che la tabella esista
+    createTableIfMissing: false, // metti true se vuoi l'auto-creazione
+    ttl: sessionTtlMs,
   });
+
+  const isProd = process.env.NODE_ENV === "production";
+
   return session({
+    store,
     secret: process.env.SESSION_SECRET!,
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
+      maxAge: sessionTtlMs,
       httpOnly: true,
-      secure: true,
-      maxAge: sessionTtl,
+      sameSite: "lax",
+      secure: isProd, // in produzione serve HTTPS + app.set('trust proxy', 1)
     },
   });
 }
 
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
-}
-
-async function upsertUser(claims: any) {
-  return await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
-}
-
+/**
+ * SETUP GOOGLE OAUTH 2.0 (passport-google-oauth20)
+ */
 export async function setupAuth(app: Express) {
-  app.set("trust proxy", 1);
-  app.use(getSession());
+  // Strategia Google
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL!, // es. http://localhost:5050/auth/google/callback
+      },
+      async (_accessToken, _refreshToken, profile: Profile, done) => {
+        try {
+          const user = {
+            id: profile.id,
+            email: profile.emails?.[0]?.value ?? null,
+            name: profile.displayName ?? null,
+            picture: profile.photos?.[0]?.value ?? null,
+            provider: "google",
+          };
+          // TODO: qui potresti sincronizzare su DB se ti serve
+          return done(null, user);
+        } catch (err) {
+          return done(err as any, undefined);
+        }
+      }
+    )
+  );
+
+  // Serialize/deserialize utente in sessione
+  passport.serializeUser((user, done) => {
+    done(null, user);
+  });
+
+  passport.deserializeUser((obj: any, done) => {
+    done(null, obj);
+  });
+
+  // Inizializza passport + sessione
   app.use(passport.initialize());
   app.use(passport.session());
 
-  const config = await getOidcConfig();
+  // Rotta di login (redirect a Google)
+  app.get(
+    "/auth/google",
+    passport.authenticate("google", { scope: ["profile", "email"] })
+  );
 
-  const verify: VerifyFunction = async (
-    tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
-  ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    const canonicalUser = await upsertUser(tokens.claims());
-    (user as any).claims.sub = canonicalUser.id;
-    verified(null, user);
-  };
-
-  // Register strategies for all domains including .replit.dev and .repl.co variants
-  const domains = process.env.REPLIT_DOMAINS!.split(",");
-  const allDomainsSet = new Set<string>();
-  
-  for (const domain of domains) {
-    allDomainsSet.add(domain);
-    // Add both .replit.dev and .repl.co variants
-    if (domain.includes('.replit.dev')) {
-      allDomainsSet.add(domain.replace('.replit.dev', '.repl.co'));
-    } else if (domain.includes('.repl.co')) {
-      allDomainsSet.add(domain.replace('.repl.co', '.replit.dev'));
-    }
-  }
-  
-  const allDomains = Array.from(allDomainsSet);
-  
-  for (const domain of allDomains) {
-    const strategy = new Strategy(
-      {
-        name: `replitauth:${domain}`,
-        config,
-        scope: "openid email profile offline_access",
-        callbackURL: `https://${domain}/api/callback`,
-      },
-      verify
-    );
-    passport.use(strategy);
-  }
-
-  passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-
-  app.get("/api/login", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
-  });
-
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+  // Callback di Google
+  app.get(
+    "/auth/google/callback",
+    passport.authenticate("google", {
+      failureRedirect: "/auth/login-failed",
       successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
-    })(req, res, next);
+    })
+  );
+
+  // Logout (invalida sessione)
+  app.post("/auth/logout", (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      req.session.destroy(() => {
+        res.redirect("/");
+      });
+    });
   });
 
-  app.get("/api/logout", (req, res) => {
-    req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
-    });
+  // Info utente corrente (per il client)
+  app.get("/auth/me", (req, res) => {
+    if (!req.user) return res.status(401).json({ user: null });
+    res.json({ user: req.user });
   });
 }
 
-export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
+/**
+ * MIDDLEWARE DI AUTORIZZAZIONE (se/quando servono ruoli)
+ */
+export function isAuthenticated(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const anyReq = req as any;
+  if (typeof anyReq.isAuthenticated === "function" && anyReq.isAuthenticated()) {
     return next();
   }
+  return res.status(401).json({ error: "Unauthenticated" });
+}
+export function isHost(req: Request, res: Response, next: NextFunction) {
+  return isAuthenticated(req, res, next);
+}
+export function isGuest(req: Request, res: Response, next: NextFunction) {
+  return isAuthenticated(req, res, next);
+}
+export function isAdmin(req: Request, res: Response, next: NextFunction) {
+  return isAuthenticated(req, res, next);
+}
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
 
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
-};
 
-// Middleware per verificare che l'utente sia un host
-export const isHost: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.claims?.sub) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const dbUser = await storage.getUser(user.claims.sub);
-    if (!dbUser) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (dbUser.role !== "host") {
-      return res.status(403).json({ message: "Forbidden: Host role required" });
-    }
-
-    return next();
-  } catch (error) {
-    console.error("Error checking host role:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-// Middleware per verificare che l'utente sia un guest
-export const isGuest: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.claims?.sub) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const dbUser = await storage.getUser(user.claims.sub);
-    if (!dbUser) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (dbUser.role !== "guest") {
-      return res.status(403).json({ message: "Forbidden: Guest role required" });
-    }
-
-    return next();
-  } catch (error) {
-    console.error("Error checking guest role:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-// Middleware per verificare che l'utente sia un admin
-export const isAdmin: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
-
-  if (!req.isAuthenticated() || !user.claims?.sub) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  try {
-    const dbUser = await storage.getUser(user.claims.sub);
-    if (!dbUser) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (dbUser.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden: Admin role required" });
-    }
-
-    return next();
-  } catch (error) {
-    console.error("Error checking admin role:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-};
