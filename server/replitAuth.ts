@@ -1,102 +1,88 @@
 // server/replitAuth.ts
-import * as openid from "openid-client";
-import { Strategy, type VerifyFunction } from "openid-client/passport";
+// server/replitAuth.ts
 import passport from "passport";
 import session from "express-session";
 import type { Express, Request, Response, NextFunction, RequestHandler } from "express";
-import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
 
-if (!process.env.DATABASE_URL) throw new Error("Environment variable DATABASE_URL not provided");
-if (!process.env.SESSION_SECRET) throw new Error("Environment variable SESSION_SECRET not provided");
-if (!process.env.GOOGLE_CLIENT_ID) throw new Error("Environment variable GOOGLE_CLIENT_ID not provided");
-if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error("Environment variable GOOGLE_CLIENT_SECRET not provided");
-if (!process.env.GOOGLE_REDIRECT_URL) throw new Error("Environment variable GOOGLE_REDIRECT_URL not provided");
+/** Controlli env */
+if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL missing");
+if (!process.env.SESSION_SECRET) throw new Error("SESSION_SECRET missing");
+if (!process.env.GOOGLE_CLIENT_ID) throw new Error("GOOGLE_CLIENT_ID missing");
+if (!process.env.GOOGLE_CLIENT_SECRET) throw new Error("GOOGLE_CLIENT_SECRET missing");
+if (!process.env.GOOGLE_REDIRECT_URL) throw new Error("GOOGLE_REDIRECT_URL missing");
 
-function getIssuerConstructor(): any {
-  const anyOpenid = openid as any;
-  return anyOpenid.Issuer || anyOpenid.default?.Issuer;
-}
-
-const getOidcClient = memoize(
-  async () => {
-    const IssuerCtor = getIssuerConstructor();
-    if (!IssuerCtor) {
-      throw new Error("openid-client: Issuer constructor not found on module.");
-    }
-    const googleIssuer = await IssuerCtor.discover("https://accounts.google.com");
-    const oidcClient = new googleIssuer.Client({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uris: [process.env.GOOGLE_REDIRECT_URL!], // *** QUI usa l'URL di Render ***
-      response_types: ["code"],
-    });
-    return oidcClient;
-  },
-  { maxAge: 3600 * 1000 }
-);
-
+/** Sessione con Postgres */
 export function getSession(): RequestHandler {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 settimana
   const PgStore = connectPg(session);
-  const store = new PgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
-
-  const isProd = process.env.NODE_ENV === "production";
+  const oneWeek = 7 * 24 * 60 * 60 * 1000;
 
   return session({
-    store,
+    store: new PgStore({
+      conString: process.env.DATABASE_URL,
+      tableName: "sessions",
+      createTableIfMissing: true,
+      ttl: oneWeek,
+    }),
     secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      maxAge: sessionTtl,
+      maxAge: oneWeek,
       httpOnly: true,
-      sameSite: "lax",
-      secure: isProd, // *** cookie solo secure in prod (HTTPS su Render) ***
+      sameSite: process.env.NODE_ENV === "production" ? "lax" : "lax",
+      secure: process.env.NODE_ENV === "production", // true in prod dietro HTTPS
     },
-    name: "sid",
   });
 }
 
+/** Setup Google OAuth2 */
 export async function setupAuth(app: Express) {
-  const oidcClient = await getOidcClient();
-
-  const verify: VerifyFunction = (_tokenset, userinfo, done) => {
-    const info: any = userinfo || {};
-    const user = {
-      id: info.sub,
-      email: info.email,
-      name: info.name,
-      picture: info.picture,
-      provider: "google",
-    };
-    return done(null, user);
-  };
-
-  const strategy = new Strategy({ client: oidcClient, passReqToCallback: false }, verify);
-  passport.use("google", strategy);
-
   passport.serializeUser((user, done) => done(null, user));
   passport.deserializeUser((obj: any, done) => done(null, obj));
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: process.env.GOOGLE_REDIRECT_URL!, // deve combaciare con Google Console
+      },
+      (_accessToken, _refreshToken, profile: Profile, done) => {
+        const user = {
+          id: profile.id,
+          email: profile.emails?.[0]?.value ?? null,
+          name: profile.displayName ?? null,
+          picture: profile.photos?.[0]?.value ?? null,
+          provider: "google" as const,
+        };
+        return done(null, user);
+      }
+    )
+  );
 
   app.use(passport.initialize());
   app.use(passport.session());
 
-  app.get("/auth/google", passport.authenticate("google", { scope: ["openid", "profile", "email"] }));
-
+  // login
   app.get(
-    "/auth/google/callback",
-    passport.authenticate("google", {
-      failureRedirect: "/auth/login-failed",
-      successReturnToOrRedirect: "/",
-    })
+    "/auth/google",
+    passport.authenticate("google", { scope: ["openid", "profile", "email"], prompt: "consent" })
   );
 
+  // callback
+  app.get(
+    "/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/" }),
+    (req: Request, res: Response) => {
+      const returnTo = (req.session as any).returnTo || "/";
+      delete (req.session as any).returnTo;
+      res.redirect(returnTo);
+    }
+  );
+
+  // logout
   app.post("/auth/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
@@ -104,12 +90,14 @@ export async function setupAuth(app: Express) {
     });
   });
 
+  // utente corrente
   app.get("/auth/me", (req, res) => {
     if (!req.user) return res.status(401).json({ user: null });
     res.json({ user: req.user });
   });
 }
 
+/** Middleware base */
 export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   const anyReq = req as any;
   if (typeof anyReq.isAuthenticated === "function" && anyReq.isAuthenticated()) return next();
@@ -118,6 +106,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 export const isHost = isAuthenticated;
 export const isGuest = isAuthenticated;
 export const isAdmin = isAuthenticated;
+
 
 
 
