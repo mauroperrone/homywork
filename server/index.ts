@@ -1,18 +1,21 @@
 // server/index.ts
 import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduler } from "./scheduler";
+import { getSession, setupAuth } from "./replitAuth";
+import { registerRoutes } from "./routes";
 
 const app = express();
 
-// *** IMPORTANTE per Render/HTTPS dietro proxy ***
+// dietro proxy/https (Render) per cookie Secure
 app.set("trust proxy", 1);
 
+// parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// log leggero /api/*
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -28,9 +31,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+      if (capturedJsonResponse) logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       if (logLine.length > 80) logLine = logLine.slice(0, 79) + "…";
       log(logLine);
     }
@@ -40,10 +41,20 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app); // qui dentro viene montata la sessione
+  // ORDINE CORRETTO:
+  // 1) sessione
+  app.use(getSession());
 
+  // 2) auth (passport + rotte /auth/*)
+  await setupAuth(app);
+
+  // 3) altre API e server HTTP
+  const server = await registerRoutes(app);
+
+  // 4) scheduler
   startScheduler();
 
+  // 5) error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -51,17 +62,22 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  // 6) client: vite in dev, statici in prod
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
+  // 7) avvio
   const port = parseInt(process.env.PORT || '5050', 10);
   server.listen(
     { port, host: "0.0.0.0", reusePort: true },
     () => log(`serving on port ${port}`)
   );
 })();
+
+
+
 
 

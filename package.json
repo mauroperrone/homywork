@@ -5,8 +5,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "rimraf dist && vite build && tsc -p tsconfig.json",
-"start": "NODE_ENV=production node dist/index.js",
+    "build": "rimraf dist && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -102,7 +102,7 @@
     "@types/express-session": "^1.18.0",
     "@types/node": "20.16.11",
     "@types/passport": "^1.0.16",
-    "@types/passport-google-oauth20": "^2.0.17",
+    "@types/passport-google-oauth20": "^2.0.13",
     "@types/passport-local": "^1.0.38",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
@@ -112,7 +112,7 @@
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
-    "rimraf": "^6.1.2",
+    "rimraf": "^5.0.7",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",
