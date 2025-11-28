@@ -6,12 +6,15 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-// admin fisso per ora
+// admin fisso
 const ADMIN_EMAIL = "mauro@homywork.net";
+
+// host fissati (per ora)
+const HOST_EMAILS: string[] = ["allamape2007@gmail.com"];
 
 router.get("/me", async (req: Request, res: Response) => {
   try {
-    // QUI usiamo solo ciò che la tua auth mette su req.user
+    // Usiamo ciò che la tua auth mette su req.user
     const authUser = (req as any).user;
 
     if (!authUser || !authUser.email) {
@@ -39,14 +42,16 @@ router.get("/me", async (req: Request, res: Response) => {
       id = rows[0].id;
       role = (rows[0].role as UserRole | null) ?? "guest";
     } else {
-      // Utente non presente a DB: lo trattiamo comunque come guest/admin
-      id = email; // placeholder: al frontend non interessa l'id per ora
+      // Utente non presente a DB: gli diamo un id placeholder
+      id = email; // al frontend per ora basta
       role = "guest";
     }
 
-    // override: se è l'admin, il ruolo è sempre admin
+    // override ruoli basato sull'email
     if (email === ADMIN_EMAIL) {
       role = "admin";
+    } else if (HOST_EMAILS.includes(email)) {
+      role = "host";
     }
 
     return res.json({
