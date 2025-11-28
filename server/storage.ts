@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db/db";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { 
   users, properties, bookings, availability, calendarSyncs, reviews,

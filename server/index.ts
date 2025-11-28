@@ -1,6 +1,8 @@
 // server/index.ts
-import 'dotenv/config';
-import express, { type Request, Response, NextFunction } from "express";
+import "dotenv/config";
+import express, { type Request, type Response, type NextFunction } from "express";
+
+import meRoute from "./meRoute";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduler } from "./scheduler";
 import { getSession, setupAuth } from "./replitAuth";
@@ -10,6 +12,9 @@ const app = express();
 
 // dietro proxy/https (Render) per cookie Secure
 app.set("trust proxy", 1);
+
+// disattiva ETag per evitare risposte 304 sulle API
+app.set("etag", false);
 
 // parsers
 app.use(express.json());
@@ -31,7 +36,8 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse)
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       if (logLine.length > 80) logLine = logLine.slice(0, 79) + "…";
       log(logLine);
     }
@@ -39,6 +45,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// route /api/me per ottenere l'utente corrente (admin/host/guest)
+app.use("/api", meRoute);
 
 (async () => {
   // ORDINE CORRETTO:
@@ -70,12 +79,14 @@ app.use((req, res, next) => {
   }
 
   // 7) avvio
-  const port = parseInt(process.env.PORT || '5050', 10);
+  const port = parseInt(process.env.PORT || "5050", 10);
   server.listen(
     { port, host: "0.0.0.0", reusePort: true },
     () => log(`serving on port ${port}`)
   );
 })();
+
+
 
 
 

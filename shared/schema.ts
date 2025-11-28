@@ -15,18 +15,21 @@ export const sessions = pgTable(
 );
 
 // Tabella utenti - gestita tramite Replit Auth
+// dentro il file che esporta il tuo schema Drizzle, es:
+// shared/schema.ts oppure apps/shared/src/schema.ts
+
+import { pgTable, text } from "drizzle-orm/pg-core";
+
+export type UserRole = "guest" | "host" | "admin";
+
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: text("role").notNull().default("guest"), // 'guest', 'host', o 'admin'
-  stripeAccountId: varchar("stripe_account_id"), // Stripe Connect Express account ID
-  stripeOnboardingComplete: boolean("stripe_onboarding_complete").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  name: text("name"),
+  picture: text("picture"),
+  role: text("role").$type<UserRole>().default("guest")
 });
+
 
 // Tabella proprietà/immobili
 export const properties = pgTable("properties", {
