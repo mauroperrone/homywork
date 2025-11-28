@@ -13,7 +13,7 @@ const app = express();
 // dietro proxy/https (Render) per cookie Secure
 app.set("trust proxy", 1);
 
-// disattiva ETag per evitare risposte 304 sulle API
+// disattiva ETag per evitare 304 sulle API
 app.set("etag", false);
 
 // parsers
@@ -46,24 +46,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// route /api/me per ottenere l'utente corrente (admin/host/guest)
-app.use("/api", meRoute);
-
 (async () => {
-  // ORDINE CORRETTO:
-  // 1) sessione
+  // 1) sessione (prima di tutto il resto)
   app.use(getSession());
 
-  // 2) auth (passport + rotte /auth/*)
+  // 2) auth (passport + rotte /auth/*), popola req.user
   await setupAuth(app);
 
-  // 3) altre API e server HTTP
+  // 3) API /api/me basata su req.user + DB users
+  app.use("/api", meRoute);
+
+  // 4) altre API e server HTTP
   const server = await registerRoutes(app);
 
-  // 4) scheduler
+  // 5) scheduler
   startScheduler();
 
-  // 5) error handler
+  // 6) error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -71,24 +70,17 @@ app.use("/api", meRoute);
     throw err;
   });
 
-  // 6) client: vite in dev, statici in prod
+  // 7) client: vite in dev, statici in prod
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // 7) avvio
+  // 8) avvio
   const port = parseInt(process.env.PORT || "5050", 10);
   server.listen(
     { port, host: "0.0.0.0", reusePort: true },
     () => log(`serving on port ${port}`)
   );
 })();
-
-
-
-
-
-
-

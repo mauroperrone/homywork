@@ -1,70 +1,86 @@
 // server/meRoute.ts
 import { Router, Request, Response } from "express";
-import jwt from "jsonwebtoken";
 import { db } from "./db/db";
 import { users, UserRole } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const router = Router();
 
-interface SessionTokenPayload {
-  sub: string;
-  email: string;
-  role?: UserRole;
-  iat?: number;
-  exp?: number;
-}
+const ADMIN_EMAIL = "mauro@homywork.net";
 
 router.get("/me", async (req: Request, res: Response) => {
   try {
-    // NB: qui assumiamo che qualche middleware (session / cookie-parser)
-    // abbia già messo i cookie su req. Se non c'è cookie "session",
-    // rispondiamo 401.
-    const token = (req as any).cookies?.session;
+    // Qui NON usiamo più JWT o cookie "session"
+    // Usiamo quello che la tua auth già mette su req (es. passport).
+    const authUser = (req as any).user;
 
-    if (!token) {
+    if (!authUser || !authUser.email) {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as SessionTokenPayload;
+    const email: string = authUser.email;
+    const name: string | undefined = authUser.name;
+    const picture: string | undefined = authUser.picture;
 
-    if (!decoded?.sub) {
-      return res.status(401).json({ error: "Invalid session" });
-    }
-
-    const result = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        name: users.name,
-        picture: users.picture,
-        role: users.role
-      })
+    // Cerchiamo l'utente nel DB per email
+    const existing = await db
+      .select()
       .from(users)
-      .where(eq(users.id, decoded.sub));
+      .where(eq(users.email, email));
 
-    if (result.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+    let finalRole: UserRole = "guest";
+    let id: string;
+
+    if (existing.length === 0) {
+      // Se non esiste ancora nel DB, lo creiamo adesso.
+      finalRole = email === ADMIN_EMAIL ? "admin" : "guest";
+      // usiamo l'email come id logico se il tuo schema lo consente,
+      // altrimenti, se il tuo schema prevede un altro id, adattalo.
+      id = email;
+
+      await db.insert(users).values({
+        id,
+        email,
+        name,
+        picture,
+        role: finalRole
+      });
+
+      console.log(`[meRoute] Creato utente ${email} con ruolo ${finalRole}`);
+    } else {
+      const u = existing[0];
+      id = u.id;
+      // Se nel DB non c'è il ruolo, lo normalizziamo a guest/admin.
+      let roleFromDb = (u.role as UserRole | null) ?? "guest";
+
+      if (email === ADMIN_EMAIL && roleFromDb !== "admin") {
+        roleFromDb = "admin";
+        await db
+          .update(users)
+          .set({ role: roleFromDb })
+          .where(eq(users.id, u.id));
+        console.log(
+          `[meRoute] Aggiornato ruolo di ${email} da ${u.role} a admin`
+        );
+      }
+
+      finalRole = roleFromDb;
     }
-
-    const user = result[0];
 
     return res.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-      role: (user.role as UserRole) || "guest"
+      id,
+      email,
+      name,
+      picture,
+      role: finalRole
     });
   } catch (err) {
     console.error("/api/me error", err);
-    return res.status(401).json({ error: "Invalid or expired session" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
 export default router;
+
 
 
