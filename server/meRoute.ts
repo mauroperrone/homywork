@@ -6,12 +6,12 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
+// admin fisso per ora
 const ADMIN_EMAIL = "mauro@homywork.net";
 
 router.get("/me", async (req: Request, res: Response) => {
   try {
-    // Qui NON usiamo più JWT o cookie "session"
-    // Usiamo quello che la tua auth già mette su req (es. passport).
+    // QUI usiamo solo ciò che la tua auth mette su req.user
     const authUser = (req as any).user;
 
     if (!authUser || !authUser.email) {
@@ -22,57 +22,39 @@ router.get("/me", async (req: Request, res: Response) => {
     const name: string | undefined = authUser.name;
     const picture: string | undefined = authUser.picture;
 
-    // Cerchiamo l'utente nel DB per email
-    const existing = await db
-      .select()
+    // Proviamo a leggere l'utente dal DB per email
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        role: users.role
+      })
       .from(users)
       .where(eq(users.email, email));
 
-    let finalRole: UserRole = "guest";
-    let id: string;
+    let id: string | null = null;
+    let role: UserRole = "guest";
 
-    if (existing.length === 0) {
-      // Se non esiste ancora nel DB, lo creiamo adesso.
-      finalRole = email === ADMIN_EMAIL ? "admin" : "guest";
-      // usiamo l'email come id logico se il tuo schema lo consente,
-      // altrimenti, se il tuo schema prevede un altro id, adattalo.
-      id = email;
-
-      await db.insert(users).values({
-        id,
-        email,
-        name,
-        picture,
-        role: finalRole
-      });
-
-      console.log(`[meRoute] Creato utente ${email} con ruolo ${finalRole}`);
+    if (rows.length > 0) {
+      id = rows[0].id;
+      role = (rows[0].role as UserRole | null) ?? "guest";
     } else {
-      const u = existing[0];
-      id = u.id;
-      // Se nel DB non c'è il ruolo, lo normalizziamo a guest/admin.
-      let roleFromDb = (u.role as UserRole | null) ?? "guest";
+      // Utente non presente a DB: lo trattiamo comunque come guest/admin
+      id = email; // placeholder: al frontend non interessa l'id per ora
+      role = "guest";
+    }
 
-      if (email === ADMIN_EMAIL && roleFromDb !== "admin") {
-        roleFromDb = "admin";
-        await db
-          .update(users)
-          .set({ role: roleFromDb })
-          .where(eq(users.id, u.id));
-        console.log(
-          `[meRoute] Aggiornato ruolo di ${email} da ${u.role} a admin`
-        );
-      }
-
-      finalRole = roleFromDb;
+    // override: se è l'admin, il ruolo è sempre admin
+    if (email === ADMIN_EMAIL) {
+      role = "admin";
     }
 
     return res.json({
       id,
       email,
-      name,
-      picture,
-      role: finalRole
+      name: name ?? null,
+      picture: picture ?? null,
+      role
     });
   } catch (err) {
     console.error("/api/me error", err);
@@ -81,6 +63,3 @@ router.get("/me", async (req: Request, res: Response) => {
 });
 
 export default router;
-
-
-
