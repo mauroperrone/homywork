@@ -2,6 +2,7 @@
 import type { Express } from "express";
 import http from "http";
 import meRoute from "./meRoute";
+import propertiesRoute from "./propertiesRoute";
 import { isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express) {
@@ -14,14 +15,12 @@ export async function registerRoutes(app: Express) {
   app.use("/api", isAuthenticated, meRoute);
   // -> /api/me
 
-  // Qui in futuro monteremo:
-  // - /api/properties (host/guest)
-  // - /api/bookings
-  // - /api/admin/* (protette da isAdmin)
-  // ecc.
+  // Rotte per immobili:
+  // - GET /api/properties (pubblico)
+  // - GET /api/host/properties (host/admin)
+  // - POST /api/host/properties (host/admin)
+  app.use("/api", propertiesRoute);
 
   const server = http.createServer(app);
   return server;
 }
-
-

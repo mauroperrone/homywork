@@ -1,194 +1,181 @@
+// shared/schema.ts
+
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, timestamp, jsonb, index, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  decimal,
+  boolean,
+  timestamp,
+  jsonb,
+  index,
+  unique,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table - Required for Replit Auth
+/**
+ * Tabella sessioni - usata da connect-pg-simple per la sessione Express
+ */
 export const sessions = pgTable(
   "sessions",
   {
     sid: varchar("sid").primaryKey(),
     sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
+    expire: timestamp("expire", { withTimezone: false }).notNull(),
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  (table) => [index("idx_session_expire").on(table.expire)],
 );
 
-// Tabella utenti - gestita tramite Replit Auth
-// dentro il file che esporta il tuo schema Drizzle, es:
-// shared/schema.ts oppure apps/shared/src/schema.ts
-
-import { pgTable, text } from "drizzle-orm/pg-core";
-
+/**
+ * Utenti applicativi (agganciati a Google OAuth)
+ *
+ * ATTENZIONE: le colonne qui sono MINIME e coerenti con
+ * l'uso che ne facciamo ora (email, name, picture, role).
+ */
 export type UserRole = "guest" | "host" | "admin";
 
 export const users = pgTable("users", {
-  id: text("id").primaryKey(),
+  id: text("id").primaryKey(), // es. sub Google
   email: text("email").notNull().unique(),
   name: text("name"),
   picture: text("picture"),
-  role: text("role").$type<UserRole>().default("guest")
+  role: text("role").$type<UserRole>().default("guest"),
 });
 
+/**
+ * Immobili (properties) - MVP stile Airbnb
+ * hostId = users.id dell'host proprietario
+ *
+ * NOTA: usiamo isActive perché è quello che server/storage.ts si aspetta
+ * (getProperties, updatePropertyStatus, ecc.).
+ */
+export const properties = pgTable(
+  "properties",
+  {
+    id: text("id").primaryKey(), // per ora lo genereremo lato app (es. nanoid/uuid)
+    hostId: text("host_id")
+      .notNull()
+      .references(() => users.id),
+    title: varchar("title", { length: 200 }).notNull(),
+    description: text("description"),
+    city: varchar("city", { length: 100 }),
+    address: text("address"),
+    pricePerNightCents: integer("price_per_night_cents").notNull(), // prezzo in centesimi di euro
+    maxGuests: integer("max_guests").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: false })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: false })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    hostIdx: index("idx_properties_host_id").on(table.hostId),
+    cityIdx: index("idx_properties_city").on(table.city),
+    activeIdx: index("idx_properties_active").on(table.isActive),
+  }),
+);
 
-// Tabella proprietà/immobili
-export const properties = pgTable("properties", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  hostId: varchar("host_id").notNull().references(() => users.id),
-  title: text("title").notNull(),
-  description: text("description").notNull(),
-  propertyType: text("property_type").notNull(), // 'apartment', 'house', 'villa', 'room'
-  address: text("address").notNull(),
-  city: text("city").notNull(),
-  country: text("country").notNull().default("Italia"),
-  latitude: decimal("latitude", { precision: 10, scale: 7 }),
-  longitude: decimal("longitude", { precision: 10, scale: 7 }),
-  pricePerNight: integer("price_per_night").notNull(),
-  maxGuests: integer("max_guests").notNull(),
-  bedrooms: integer("bedrooms").notNull(),
-  beds: integer("beds").notNull(),
-  bathrooms: integer("bathrooms").notNull(),
-  images: text("images").array().notNull().default(sql`ARRAY[]::text[]`),
-  amenities: text("amenities").array().notNull().default(sql`ARRAY[]::text[]`), // wifi, parking, kitchen, etc.
-  wifiSpeed: integer("wifi_speed"), // Mbps misurati
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Tabella prenotazioni
+/**
+ * Bookings - prenotazioni
+ * Schema minimale ricostruito a partire dall'uso in server/storage.ts
+ */
 export const bookings = pgTable("bookings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyId: varchar("property_id").notNull().references(() => properties.id),
-  guestId: varchar("guest_id").notNull().references(() => users.id),
-  checkIn: timestamp("check_in").notNull(),
-  checkOut: timestamp("check_out").notNull(),
-  guests: integer("guests").notNull(),
-  totalPrice: integer("total_price").notNull(),
-  status: text("status").notNull().default("pending"), // 'pending', 'confirmed', 'cancelled', 'completed'
+  id: text("id").primaryKey(),
+  propertyId: text("property_id")
+    .notNull()
+    .references(() => properties.id),
+  guestId: text("guest_id")
+    .notNull()
+    .references(() => users.id),
+  status: varchar("status", { length: 50 }).notNull(), // es: pending, confirmed, cancelled
+  checkIn: timestamp("check_in", { withTimezone: false }).notNull(),
+  checkOut: timestamp("check_out", { withTimezone: false }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: false })
+    .notNull()
+    .defaultNow(),
+
+  // Dati per payout / Stripe
+  payoutStatus: varchar("payout_status", { length: 50 })
+    .notNull()
+    .default("pending"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
-  payoutStatus: text("payout_status").notNull().default("pending"), // 'pending', 'scheduled', 'completed', 'failed'
-  payoutAmount: integer("payout_amount"), // Amount to transfer to host (in cents)
-  platformFee: integer("platform_fee"), // Platform commission (in cents)
-  payoutDate: timestamp("payout_date"), // When transfer was executed
-  stripeTransferId: text("stripe_transfer_id"), // Stripe Transfer ID for audit
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => [
-  index("IDX_booking_payout").on(table.payoutStatus, table.checkIn),
-]);
-
-// Tabella disponibilità/blocchi calendario
-export const availability = pgTable("availability", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyId: varchar("property_id").notNull().references(() => properties.id),
-  date: timestamp("date").notNull(),
-  isAvailable: boolean("is_available").notNull().default(true),
-  source: text("source").notNull().default("manual"), // 'manual', 'airbnb', 'booking', 'google'
-}, (table) => ({
-  uniquePropertyDate: unique("UQ_availability_property_date").on(table.propertyId, table.date),
-}));
-
-// Tabella sincronizzazioni calendario
-export const calendarSyncs = pgTable("calendar_syncs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyId: varchar("property_id").notNull().references(() => properties.id),
-  platform: text("platform").notNull(), // 'airbnb', 'booking', 'google'
-  icalUrl: text("ical_url"),
-  accessToken: text("access_token"), // per Google Calendar
-  syncEnabled: boolean("sync_enabled").notNull().default(true),
-  lastSyncedAt: timestamp("last_synced_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  payoutAmount: integer("payout_amount"), // in centesimi
+  platformFee: integer("platform_fee"), // in centesimi
+  payoutDate: timestamp("payout_date", { withTimezone: false }),
+  stripeTransferId: text("stripe_transfer_id"),
 });
 
-// Tabella recensioni
-export const reviews = pgTable("reviews", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  propertyId: varchar("property_id").notNull().references(() => properties.id),
-  guestId: varchar("guest_id").notNull().references(() => users.id),
-  bookingId: varchar("booking_id").notNull().references(() => bookings.id),
-  rating: integer("rating").notNull(), // 1-5
-  comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+/**
+ * Availability - blocchi di disponibilità per singola data
+ */
+export const availability = pgTable(
+  "availability",
+  {
+    propertyId: text("property_id")
+      .notNull()
+      .references(() => properties.id),
+    date: timestamp("date", { withTimezone: false }).notNull(),
+    isAvailable: boolean("is_available").notNull().default(true),
+    source: varchar("source", { length: 50 }).notNull(), // es: "manual", "ical"
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.propertyId, table.date] }),
+    propertyIdx: index("idx_availability_property").on(table.propertyId),
+  }),
+);
 
-// Zod schemas per validazione
-export const upsertUserSchema = createInsertSchema(users).omit({
-  createdAt: true,
-  updatedAt: true,
-  role: true,
-});
+/**
+ * Calendar Syncs - collegamenti a calendari esterni (es. iCal Booking/Airbnb)
+ */
+export const calendarSyncs = pgTable(
+  "calendar_syncs",
+  {
+    id: text("id").primaryKey(),
+    propertyId: text("property_id")
+      .notNull()
+      .references(() => properties.id),
+    url: text("url").notNull(),
+    lastSyncedAt: timestamp("last_synced_at", {
+      withTimezone: false,
+    }),
+    isActive: boolean("is_active").notNull().default(true),
+  },
+  (table) => ({
+    propertyIdx: index("idx_calendar_syncs_property").on(table.propertyId),
+  }),
+);
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+/**
+ * Reviews - recensioni degli ospiti sugli immobili
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    propertyId: text("property_id")
+      .notNull()
+      .references(() => properties.id),
+    guestId: text("guest_id")
+      .notNull()
+      .references(() => users.id),
+    rating: integer("rating").notNull(), // es: 1..5
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: false })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    propertyIdx: index("idx_reviews_property").on(table.propertyId),
+    guestIdx: index("idx_reviews_guest").on(table.guestId),
+  }),
+);
 
-export const insertPropertySchema = createInsertSchema(properties).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  images: z.array(z.string()).optional().default([]),
-  amenities: z.array(z.string()),
-  wifiSpeed: z.number()
-    .min(1, "Velocità WiFi deve essere almeno 1 Mbps")
-    .max(2000, "Velocità WiFi massima: 2000 Mbps")
-    .int("Velocità WiFi deve essere un numero intero")
-    .optional(),
-});
-
-export const insertBookingSchema = createInsertSchema(bookings).omit({
-  id: true,
-  createdAt: true,
-  stripePaymentIntentId: true,
-  payoutStatus: true,
-  payoutAmount: true,
-  platformFee: true,
-  payoutDate: true,
-  stripeTransferId: true,
-}).extend({
-  checkIn: z.date(),
-  checkOut: z.date(),
-});
-
-export const insertCalendarSyncSchema = createInsertSchema(calendarSyncs).omit({
-  id: true,
-  createdAt: true,
-  lastSyncedAt: true,
-});
-
-export const insertReviewSchema = createInsertSchema(reviews).omit({
-  id: true,
-  createdAt: true,
-});
-
-// TypeScript types
-export type UpsertUser = z.infer<typeof upsertUserSchema>;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-export type InsertProperty = z.infer<typeof insertPropertySchema>;
-export type Property = typeof properties.$inferSelect;
-
-export type InsertBooking = z.infer<typeof insertBookingSchema>;
-export type Booking = typeof bookings.$inferSelect;
-
-export type InsertCalendarSync = z.infer<typeof insertCalendarSyncSchema>;
-export type CalendarSync = typeof calendarSyncs.$inferSelect;
-
-export type InsertReview = z.infer<typeof insertReviewSchema>;
-export type Review = typeof reviews.$inferSelect;
-
-// Tipo esteso per proprietà con relazioni
-export type PropertyWithHost = Property & {
-  host: User;
-  reviews?: Review[];
-  averageRating?: number;
-};
-
-// Tipo per prenotazione con relazioni
-export type BookingWithDetails = Booking & {
-  property: Property;
-  guest: User;
-};
+// In futuro, se ci serve validazione input, possiamo usare:
+// export const insertPropertySchema = createInsertSchema(properties);
+// etc.
