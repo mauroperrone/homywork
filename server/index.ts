@@ -2,7 +2,6 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 
-import meRoute from "./meRoute";
 import { setupVite, serveStatic, log } from "./vite";
 import { startScheduler } from "./scheduler";
 import { getSession, setupAuth } from "./replitAuth";
@@ -34,7 +33,7 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
+      if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse)
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
@@ -53,16 +52,13 @@ app.use((req, res, next) => {
   // 2) auth (passport + rotte /auth/*), popola req.user
   await setupAuth(app);
 
-  // 3) API /api/me basata su req.user + DB users
-  app.use("/api", meRoute);
-
-  // 4) altre API e server HTTP
+  // 3) tutte le API /api/* sono gestite in routes.ts
   const server = await registerRoutes(app);
 
-  // 5) scheduler
+  // 4) scheduler
   startScheduler();
 
-  // 6) error handler
+  // 5) error handler
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -70,17 +66,18 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // 7) client: vite in dev, statici in prod
+  // 6) client: vite in dev, statici in prod
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // 8) avvio
+  // 7) avvio
   const port = parseInt(process.env.PORT || "5050", 10);
   server.listen(
     { port, host: "0.0.0.0", reusePort: true },
     () => log(`serving on port ${port}`)
   );
 })();
+
