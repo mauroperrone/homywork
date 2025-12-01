@@ -8,6 +8,7 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 import { InferSelectModel, InferInsertModel } from "drizzle-orm";
+import { z } from "zod";
 
 /**
  * Utenti dell'app:
@@ -50,7 +51,7 @@ export const properties = pgTable("properties", {
 });
 
 /**
- * (Prepariamo già i booking per dopo, anche se ora non li usiamo)
+ * Booking – lo prepariamo, anche se non lo usiamo ancora
  */
 export const bookings = pgTable("bookings", {
   id: text("id").primaryKey(),
@@ -68,6 +69,7 @@ export const bookings = pgTable("bookings", {
     .defaultNow(),
 });
 
+// Tipi Drizzle
 export type User = InferSelectModel<typeof users>;
 export type NewUser = InferInsertModel<typeof users>;
 
@@ -76,3 +78,49 @@ export type NewProperty = InferInsertModel<typeof properties>;
 
 export type Booking = InferSelectModel<typeof bookings>;
 export type NewBooking = InferInsertModel<typeof bookings>;
+
+/**
+ * Schema Zod per il form di creazione/modifica proprietà.
+ * Questo è quello che si aspetta PropertyForm.tsx:
+ *  - insertPropertySchema
+ *  - type InsertProperty
+ *
+ * ATTENZIONE: qui lavoriamo in EURO, non in centesimi.
+ * La conversione in centesimi la fa il backend.
+ */
+export const insertPropertySchema = z.object({
+  title: z
+    .string()
+    .min(3, "Il titolo deve avere almeno 3 caratteri")
+    .max(255, "Il titolo è troppo lungo"),
+  description: z
+    .string()
+    .max(2000, "La descrizione è troppo lunga")
+    .optional()
+    .nullable(),
+  city: z
+    .string()
+    .max(120, "La città è troppo lunga")
+    .optional()
+    .nullable(),
+  address: z
+    .string()
+    .max(255, "L'indirizzo è troppo lungo")
+    .optional()
+    .nullable(),
+  pricePerNight: z
+    .number({
+      required_error: "Il prezzo per notte è obbligatorio",
+      invalid_type_error: "Il prezzo per notte deve essere un numero",
+    })
+    .positive("Il prezzo per notte deve essere maggiore di zero"),
+  maxGuests: z
+    .number({
+      required_error: "Il numero massimo di ospiti è obbligatorio",
+      invalid_type_error: "Il numero massimo di ospiti deve essere un numero",
+    })
+    .int("Il numero massimo di ospiti deve essere un intero")
+    .positive("Il numero massimo di ospiti deve essere maggiore di zero"),
+});
+
+export type InsertProperty = z.infer<typeof insertPropertySchema>;
