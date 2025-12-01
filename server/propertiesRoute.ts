@@ -2,10 +2,22 @@
 import { Router, Request, Response } from "express";
 import { db } from "./db/db";
 import { properties } from "@shared/schema";
-import { and, eq, lte, gte } from "drizzle-orm";
-import { isHost, isAdmin } from "./replitAuth";
-import type { SessionUser } from "./replitAuth";
+import { and, eq, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
+
+/**
+ * Utente di sessione minimo come lo mette passport (replitAuth)
+ */
+type SessionUser = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  picture?: string | null;
+};
+
+// stessi override email che usiamo in meRoute
+const ADMIN_EMAIL = "mauro@homywork.net";
+const HOST_EMAILS: string[] = ["allamape2007@gmail.com"];
 
 const router = Router();
 
@@ -19,38 +31,32 @@ router.get("/properties", async (req: Request, res: Response) => {
   try {
     const { city, maxPrice } = req.query;
 
+    // condizioni base: solo immobili attivi
     const conditions = [eq(properties.isActive, true)];
 
+    // filtro città (match esatto semplice)
     if (typeof city === "string" && city.trim() !== "") {
-      // filtro per città (case-insensitive LIKE semplificato)
-      conditions.push(
-        eq(properties.city, city.trim())
-        // se vuoi un like:
-        // ilike(properties.city, `%${city.trim()}%`)
-      );
+      conditions.push(eq(properties.city, city.trim()));
     }
 
+    // filtro maxPrice (in euro → convertiamo in centesimi)
     let maxPriceCents: number | undefined;
     if (typeof maxPrice === "string" && maxPrice.trim() !== "") {
       const parsed = Number(maxPrice);
       if (!Number.isNaN(parsed) && parsed > 0) {
         maxPriceCents = Math.round(parsed * 100);
+        conditions.push(lte(properties.pricePerNightCents, maxPriceCents));
       }
     }
 
-    // Costruiamo la WHERE
-    let whereCondition = conditions[0];
-    for (let i = 1; i < conditions.length; i++) {
-      whereCondition = and(whereCondition, conditions[i]);
-    }
+    // costruiamo la WHERE finale
+    const whereCondition =
+      conditions.length === 1 ? conditions[0] : and(...conditions);
 
-    let query = db.select().from(properties).where(whereCondition);
-
-    if (maxPriceCents !== undefined) {
-      query = query.where(lte(properties.pricePerNightCents, maxPriceCents));
-    }
-
-    const rows = await query;
+    const rows = await db
+      .select()
+      .from(properties)
+      .where(whereCondition);
 
     // Convertiamo il prezzo da centesimi a euro per il frontend
     const result = rows.map((p) => ({
@@ -75,18 +81,26 @@ router.get("/properties", async (req: Request, res: Response) => {
 });
 
 /**
- * Middleware interno: richiede host OPPURE admin
- * (per gli endpoint /api/host/*)
+ * Middleware interno: richiede host OPPURE admin.
+ * Il ruolo viene dedotto dall'email come in meRoute.
  */
 const requireHostOrAdmin = (req: Request, res: Response, next: Function) => {
   const anyReq = req as any;
   const user: SessionUser | undefined = anyReq.user;
 
-  if (!user) {
+  if (!user || !user.email) {
     return res.status(401).json({ error: "Unauthenticated" });
   }
 
-  if (user.role === "host" || user.role === "admin") {
+  let role: "guest" | "host" | "admin" = "guest";
+
+  if (user.email === ADMIN_EMAIL) {
+    role = "admin";
+  } else if (HOST_EMAILS.includes(user.email)) {
+    role = "host";
+  }
+
+  if (role === "host" || role === "admin") {
     return next();
   }
 
@@ -95,7 +109,7 @@ const requireHostOrAdmin = (req: Request, res: Response, next: Function) => {
 
 /**
  * GET /api/host/properties
- * Lista immobili dell'host (o di admin, che vede i propri se ne ha)
+ * Lista immobili dell'host (o dell'admin: gli mostriamo i suoi eventuali immobili).
  */
 router.get(
   "/host/properties",
@@ -166,12 +180,24 @@ router.post(
         return res.status(400).json({ error: "Title is required" });
       }
 
-      if (!pricePerNight || typeof pricePerNight !== "number" || pricePerNight <= 0) {
-        return res.status(400).json({ error: "pricePerNight must be a positive number (euro)" });
+      if (
+        pricePerNight === undefined ||
+        typeof pricePerNight !== "number" ||
+        pricePerNight <= 0
+      ) {
+        return res
+          .status(400)
+          .json({ error: "pricePerNight must be a positive number (euro)" });
       }
 
-      if (!maxGuests || typeof maxGuests !== "number" || maxGuests <= 0) {
-        return res.status(400).json({ error: "maxGuests must be a positive number" });
+      if (
+        maxGuests === undefined ||
+        typeof maxGuests !== "number" ||
+        maxGuests <= 0
+      ) {
+        return res
+          .status(400)
+          .json({ error: "maxGuests must be a positive number" });
       }
 
       const id = randomUUID();
