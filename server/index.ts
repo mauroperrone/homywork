@@ -1,83 +1,34 @@
 // server/index.ts
-import "dotenv/config";
-import express, { type Request, type Response, type NextFunction } from "express";
-
-import { setupVite, serveStatic, log } from "./vite";
-import { startScheduler } from "./scheduler";
-import { getSession, setupAuth } from "./replitAuth";
-import { registerRoutes } from "./routes";
+import express from "express";
+import cors from "cors";
+import routes from "./routes";
+import { setupAuth } from "./replitAuth";
 
 const app = express();
 
-// dietro proxy/https (Render) per cookie Secure
-app.set("trust proxy", 1);
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-// disattiva ETag per evitare 304 sulle API
-app.set("etag", false);
-
-// parsers
+// Middleware base
+app.use(
+  cors({
+    origin: process.env.CLIENT_ORIGIN || true,
+    credentials: true,
+  }),
+);
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-// log leggero /api/*
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Auth (sessioni + Google)
+setupAuth(app);
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+// API
+app.use("/api", routes);
 
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-      if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse)
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      if (logLine.length > 80) logLine = logLine.slice(0, 79) + "…";
-      log(logLine);
-    }
-  });
-
-  next();
+// Healthcheck
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
 });
 
-(async () => {
-  // 1) sessione (prima di tutto il resto)
-  app.use(getSession());
-
-  // 2) auth (passport + rotte /auth/*), popola req.user
-  await setupAuth(app);
-
-  // 3) tutte le API /api/* sono gestite in routes.ts
-  const server = await registerRoutes(app);
-
-  // 4) scheduler
-  startScheduler();
-
-  // 5) error handler
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // 6) client: vite in dev, statici in prod
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // 7) avvio
-  const port = parseInt(process.env.PORT || "5050", 10);
-  server.listen(
-    { port, host: "0.0.0.0", reusePort: true },
-    () => log(`serving on port ${port}`)
-  );
-})();
-
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});

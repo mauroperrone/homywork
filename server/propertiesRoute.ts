@@ -4,18 +4,11 @@ import { db } from "./db/db";
 import { properties } from "@shared/schema";
 import { and, eq, lte } from "drizzle-orm";
 import { randomUUID } from "crypto";
+import { getSessionUser, type SessionUser } from "./replitAuth";
 
 /**
- * Utente di sessione minimo come lo mette passport (replitAuth)
+ * Utenti "speciali" per ruoli (fino a quando non faremo una gestione ruoli seria via admin panel)
  */
-type SessionUser = {
-  id: string;
-  email?: string | null;
-  name?: string | null;
-  picture?: string | null;
-};
-
-// stessi override email che usiamo in meRoute
 const ADMIN_EMAIL = "mauro@homywork.net";
 const HOST_EMAILS: string[] = ["allamape2007@gmail.com"];
 
@@ -31,15 +24,12 @@ router.get("/properties", async (req: Request, res: Response) => {
   try {
     const { city, maxPrice } = req.query;
 
-    // condizioni base: solo immobili attivi
     const conditions = [eq(properties.isActive, true)];
 
-    // filtro città (match esatto semplice)
     if (typeof city === "string" && city.trim() !== "") {
       conditions.push(eq(properties.city, city.trim()));
     }
 
-    // filtro maxPrice (in euro → convertiamo in centesimi)
     let maxPriceCents: number | undefined;
     if (typeof maxPrice === "string" && maxPrice.trim() !== "") {
       const parsed = Number(maxPrice);
@@ -49,16 +39,11 @@ router.get("/properties", async (req: Request, res: Response) => {
       }
     }
 
-    // costruiamo la WHERE finale
     const whereCondition =
       conditions.length === 1 ? conditions[0] : and(...conditions);
 
-    const rows = await db
-      .select()
-      .from(properties)
-      .where(whereCondition);
+    const rows = await db.select().from(properties).where(whereCondition);
 
-    // Convertiamo il prezzo da centesimi a euro per il frontend
     const result = rows.map((p) => ({
       id: p.id,
       hostId: p.hostId,
@@ -81,14 +66,12 @@ router.get("/properties", async (req: Request, res: Response) => {
 });
 
 /**
- * Middleware interno: richiede host OPPURE admin.
- * Il ruolo viene dedotto dall'email come in meRoute.
+ * Middleware: richiede host o admin, dedotti dall'email
  */
 const requireHostOrAdmin = (req: Request, res: Response, next: Function) => {
-  const anyReq = req as any;
-  const user: SessionUser | undefined = anyReq.user;
+  const user = getSessionUser(req);
 
-  if (!user || !user.email) {
+  if (!user) {
     return res.status(401).json({ error: "Unauthenticated" });
   }
 
@@ -98,6 +81,8 @@ const requireHostOrAdmin = (req: Request, res: Response, next: Function) => {
     role = "admin";
   } else if (HOST_EMAILS.includes(user.email)) {
     role = "host";
+  } else {
+    role = user.role;
   }
 
   if (role === "host" || role === "admin") {
@@ -109,15 +94,14 @@ const requireHostOrAdmin = (req: Request, res: Response, next: Function) => {
 
 /**
  * GET /api/host/properties
- * Lista immobili dell'host (o dell'admin: gli mostriamo i suoi eventuali immobili).
+ * Lista immobili dell'host loggato.
  */
 router.get(
   "/host/properties",
   requireHostOrAdmin,
   async (req: Request, res: Response) => {
     try {
-      const anyReq = req as any;
-      const user: SessionUser = anyReq.user;
+      const user = getSessionUser(req) as SessionUser;
 
       const rows = await db
         .select()
@@ -149,23 +133,13 @@ router.get(
 /**
  * POST /api/host/properties
  * Crea un nuovo immobile per l'host loggato (o admin).
- * Body JSON atteso:
- * {
- *   "title": string,
- *   "description": string,
- *   "city": string,
- *   "address": string,
- *   "pricePerNight": number,   // in euro
- *   "maxGuests": number
- * }
  */
 router.post(
   "/host/properties",
   requireHostOrAdmin,
   async (req: Request, res: Response) => {
     try {
-      const anyReq = req as any;
-      const user: SessionUser = anyReq.user;
+      const user = getSessionUser(req) as SessionUser;
 
       const {
         title,

@@ -1,251 +1,195 @@
 // server/replitAuth.ts
 import passport from "passport";
 import session from "express-session";
-import type {
-  Express,
-  Request,
-  Response,
-  NextFunction,
-  RequestHandler,
-} from "express";
+import type { Express, Request } from "express";
 import connectPg from "connect-pg-simple";
 import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
 import { db } from "./db/db";
-import { users, UserRole } from "@shared/schema";
+import { users, type User } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-/** ENV obbligatorie */
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL missing");
 if (!process.env.SESSION_SECRET) throw new Error("SESSION_SECRET missing");
 if (!process.env.GOOGLE_CLIENT_ID) throw new Error("GOOGLE_CLIENT_ID missing");
 if (!process.env.GOOGLE_CLIENT_SECRET)
   throw new Error("GOOGLE_CLIENT_SECRET missing");
-if (!process.env.GOOGLE_REDIRECT_URL)
-  throw new Error("GOOGLE_REDIRECT_URL missing");
+if (!process.env.GOOGLE_CALLBACK_URL)
+  throw new Error("GOOGLE_CALLBACK_URL missing");
 
-/** Costanti ruoli iniziali */
-// admin fisso
-const ADMIN_EMAIL = "mauro@homywork.net";
+const PgStore = connectPg(session);
 
-// host fissati (per ora)
-const HOST_EMAILS: string[] = ["allamape2007@gmail.com"];
-
-/** Tipo utente salvato in sessione */
+/**
+ * Utente minimo che teniamo in sessione
+ */
 export type SessionUser = {
   id: string;
   email: string;
-  name: string | null;
-  picture: string | null;
-  role: UserRole;
+  name?: string | null;
+  picture?: string | null;
+  role: "guest" | "host" | "admin";
 };
 
-/** Sessione con Postgres (montata PRIMA di Passport) */
-export function getSession(): RequestHandler {
-  const PgStore = connectPg(session);
-  const oneWeek = 7 * 24 * 60 * 60 * 1000;
-
-  return session({
-    store: new PgStore({
-      conString: process.env.DATABASE_URL,
-      tableName: "sessions",
-      createTableIfMissing: true,
-      ttl: oneWeek,
+export function setupAuth(app: Express) {
+  // Sessioni persistenti su Postgres (Neon)
+  app.use(
+    session({
+      store: new PgStore({
+        conString: process.env.DATABASE_URL,
+        tableName: "user_sessions",
+        createTableIfMissing: true,
+      }),
+      secret: process.env.SESSION_SECRET!,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        secure: false, // su Render dietro proxy va bene così, se metti HTTPS diretto cambiamo
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      },
     }),
-    secret: process.env.SESSION_SECRET!,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: oneWeek,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-    },
-    name: "sid",
-  });
-}
-
-/** Setup Google OAuth2 (montato DOPO la sessione) */
-export async function setupAuth(app: Express) {
-  // salviamo in sessione direttamente l'oggetto utente che usiamo nel backend
-  passport.serializeUser((user: any, done) => done(null, user));
-  passport.deserializeUser((obj: any, done) => done(null, obj));
-
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID: process.env.GOOGLE_CLIENT_ID!,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-        callbackURL: process.env.GOOGLE_REDIRECT_URL!,
-      },
-      async (_accessToken, _refreshToken, profile: Profile, done) => {
-        try {
-          const email = profile.emails?.[0]?.value ?? null;
-          if (!email) {
-            return done(
-              new Error("Google account has no email, cannot create user"),
-            );
-          }
-
-          const name = profile.displayName ?? null;
-          const picture = profile.photos?.[0]?.value ?? null;
-
-          // ruolo di base
-          let role: UserRole = "guest";
-
-          // override iniziale basato sull'email
-          if (email === ADMIN_EMAIL) {
-            role = "admin";
-          } else if (HOST_EMAILS.includes(email)) {
-            role = "host";
-          }
-
-          // cerchiamo utente nel DB
-          const existing = await db
-            .select()
-            .from(users)
-            .where(eq(users.email, email));
-
-          let dbUser: SessionUser;
-
-          if (existing.length > 0) {
-            let u = existing[0];
-
-            // se il ruolo nel DB è null o diverso, lo aggiorniamo a quello calcolato
-            if (!u.role || u.role !== role) {
-              const updated = await db
-                .update(users)
-                .set({
-                  name,
-                  picture,
-                  role,
-                })
-                .where(eq(users.id, u.id))
-                .returning();
-
-              u = updated[0];
-            }
-
-            dbUser = {
-              id: u.id,
-              email: u.email,
-              name: u.name ?? null,
-              picture: u.picture ?? null,
-              role: (u.role as UserRole) ?? "guest",
-            };
-          } else {
-            // utente nuovo → insert
-            const inserted = await db
-              .insert(users)
-              .values({
-                id: profile.id, // usiamo l'id Google come primary key
-                email,
-                name,
-                picture,
-                role,
-              })
-              .returning();
-
-            const u = inserted[0];
-
-            dbUser = {
-              id: u.id,
-              email: u.email,
-              name: u.name ?? null,
-              picture: u.picture ?? null,
-              role: (u.role as UserRole) ?? "guest",
-            };
-          }
-
-          return done(null, dbUser);
-        } catch (err) {
-          console.error("GoogleStrategy error", err);
-          return done(err as any);
-        }
-      },
-    ),
   );
 
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // login
-  app.get(
-    "/auth/google",
-    passport.authenticate("google", {
-      scope: ["openid", "profile", "email"],
-      prompt: "consent",
-    }),
+  // Serialize: salviamo solo l'id
+  passport.serializeUser((user: any, done) => {
+    done(null, user.id);
+  });
+
+  // Deserialize: carichiamo l'utente dal DB
+  passport.deserializeUser(async (id: string, done) => {
+    try {
+      const rows = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      const user = rows[0];
+      if (!user) {
+        return done(null, false);
+      }
+
+      const sessionUser: SessionUser = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture ?? undefined,
+        role: (user.role as SessionUser["role"]) ?? "guest",
+      };
+
+      done(null, sessionUser);
+    } catch (err) {
+      done(err as any);
+    }
+  });
+
+  // Strategia Google
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL!,
+      },
+      async (_accessToken, _refreshToken, profile: Profile, done) => {
+        try {
+          const googleId = profile.id;
+          const email = profile.emails?.[0]?.value;
+          const name = profile.displayName;
+          const picture = profile.photos?.[0]?.value;
+
+          if (!email) {
+            return done(new Error("No email from Google"), undefined as any);
+          }
+
+          // Controlliamo se esiste già
+          const existing = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, googleId))
+            .limit(1);
+
+          let user: User;
+
+          if (existing[0]) {
+            // update base
+            const [updated] = await db
+              .update(users)
+              .set({
+                email,
+                name,
+                picture,
+              })
+              .where(eq(users.id, googleId))
+              .returning();
+            user = updated;
+          } else {
+            // ruolo base: guest
+            const [inserted] = await db
+              .insert(users)
+              .values({
+                id: googleId,
+                email,
+                name,
+                picture,
+                role: "guest",
+              })
+              .returning();
+            user = inserted;
+          }
+
+          const sessionUser: SessionUser = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            picture: user.picture ?? undefined,
+            role: (user.role as SessionUser["role"]) ?? "guest",
+          };
+
+          done(null, sessionUser);
+        } catch (err) {
+          done(err as any, undefined as any);
+        }
+      },
+    ),
   );
 
-  // callback
+  // Route auth
+  app.get(
+    "/auth/google",
+    passport.authenticate("google", { scope: ["profile", "email"] }),
+  );
+
   app.get(
     "/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/" }),
-    (req: Request, res: Response) => {
-      const returnTo = (req.session as any).returnTo || "/";
-      delete (req.session as any).returnTo;
-      res.redirect(returnTo);
+    passport.authenticate("google", {
+      failureRedirect: "/auth/failure",
+    }),
+    (req, res) => {
+      res.redirect("/"); // dopo login torna in home
     },
   );
 
-  // logout
+  app.get("/auth/failure", (_req, res) => {
+    res.status(401).send("Google authentication failed");
+  });
+
   app.post("/auth/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      // @ts-ignore
-      req.session.destroy(() => res.redirect("/"));
+      req.session.destroy(() => {
+        res.clearCookie("connect.sid");
+        res.status(200).json({ ok: true });
+      });
     });
   });
-
-  // ⚠️ RIMOSSO /auth/me
-  // L'endpoint per l'utente corrente lo gestiamo in meRoute.ts come /api/me
 }
 
-/** Middleware di autorizzazione base */
-export function isAuthenticated(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) {
+/**
+ * Helper per leggere l'utente da req
+ */
+export function getSessionUser(req: Request): SessionUser | undefined {
   const anyReq = req as any;
-  if (
-    typeof anyReq.isAuthenticated === "function" &&
-    anyReq.isAuthenticated()
-  ) {
-    return next();
-  }
-  return res.status(401).json({ error: "Unauthenticated" });
+  return anyReq.user as SessionUser | undefined;
 }
-
-/** Middleware per ruoli specifici */
-export function requireRole(required: UserRole | UserRole[]) {
-  const requiredRoles = Array.isArray(required) ? required : [required];
-
-  return (req: Request, res: Response, next: NextFunction) => {
-    const anyReq = req as any;
-    const user: SessionUser | undefined = anyReq.user;
-
-    if (!user) {
-      return res.status(401).json({ error: "Unauthenticated" });
-    }
-
-    if (!requiredRoles.includes(user.role)) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
-    return next();
-  };
-}
-
-// helper dedicati
-export const isGuest = requireRole("guest");
-export const isHost = requireRole("host");
-export const isAdmin = requireRole("admin");
-
-
-
-
-
-
-
-
