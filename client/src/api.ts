@@ -2,7 +2,7 @@
 
 export type UserRole = "guest" | "host" | "admin";
 
-/** Utente corrente, come ritorna /api/me */
+/** Utente corrente */
 export interface CurrentUser {
   id: string;
   email: string;
@@ -37,6 +37,43 @@ export interface CreatePropertyInput {
 }
 
 /**
+ * Normalizza un qualsiasi oggetto grezzo in un CurrentUser,
+ * accettando sia { user: {...} } sia { ... }.
+ */
+function normalizeCurrentUser(raw: any): CurrentUser | null {
+  if (!raw) return null;
+
+  // Se il backend manda { user: {...} }, prendiamo raw.user
+  const candidate = raw.user ?? raw;
+
+  if (!candidate || typeof candidate !== "object") return null;
+  if (!candidate.email || !candidate.id) return null;
+
+  const rawRole = (candidate.role ?? "guest") as string;
+  let role: UserRole;
+
+  switch (rawRole) {
+    case "guest":
+    case "host":
+    case "admin":
+      role = rawRole;
+      break;
+    default:
+      // qualunque altra cosa la consideriamo guest
+      role = "guest";
+      break;
+  }
+
+  return {
+    id: String(candidate.id),
+    email: String(candidate.email),
+    name: candidate.name ?? null,
+    picture: candidate.picture ?? null,
+    role,
+  };
+}
+
+/**
  * Legge l'utente corrente da /api/me
  */
 export async function fetchCurrentUser(): Promise<CurrentUser | null> {
@@ -50,8 +87,9 @@ export async function fetchCurrentUser(): Promise<CurrentUser | null> {
       return null;
     }
 
-    const data = (await res.json()) as CurrentUser;
-    return data;
+    const data = await res.json();
+    const user = normalizeCurrentUser(data);
+    return user;
   } catch (err) {
     console.error("fetchCurrentUser error", err);
     return null;
@@ -69,7 +107,6 @@ export async function fetchHostProperties(): Promise<Property[]> {
     });
 
     if (!res.ok) {
-      // se ad es. 401 o 403, ritorniamo lista vuota
       console.error("fetchHostProperties error status", res.status);
       return [];
     }
